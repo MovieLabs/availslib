@@ -43,6 +43,7 @@ public class XMLGen {
     private boolean exitOnError;
     private boolean cleanupData;
     private static Logger log;
+    private int lineNo;
 
     /****************************************
      * Constructor(s)
@@ -52,12 +53,22 @@ public class XMLGen {
         this.cleanupData = cleanupData;
         this.exitOnError = exitOnError;
         this.log = log;
-        
     }
 
     /****************************************
      * Helper methods
      ****************************************/
+
+    /**
+     * 
+     */
+    void reportError(String s) throws Exception {
+        s = String.format("Line %05d: %s", lineNo, s);
+        log.warn(s);
+        if (exitOnError)
+            throw new ParseException(s, 0);
+    }
+    
 
     /**
      * Parse an input string to determine whether "Yes" or "No" is intended.  A variety of case
@@ -207,6 +218,7 @@ public class XMLGen {
      */
     private Element mDisposition(String entryType) throws Exception {
         Comment comment = null;
+        boolean err = false;
 
         if (!(entryType.equals("Full Extract") || entryType.equals("Full Delete"))) {
             if (cleanupData) {
@@ -219,14 +231,16 @@ public class XMLGen {
                     else if (m.group(1).equalsIgnoreCase("delete"))
                         entryType = "Full Delete";
                     else
-                        throw new ParseException("invalid Disposition", 0);
+                        err = true;
                 } else {
-                    throw new ParseException("invalid Disposition", 0);
+                    err = true;
                 }
             } else {
-                throw new ParseException("invalid Disposition", 0);
+                err = true;
             }
         }
+        if (err)
+            reportError("invalid Disposition: " + entryType);
         Element disp = dom.createElement("Disposition");
         Element entry = dom.createElement("EntryType");
         Text tmp = dom.createTextNode(entryType);
@@ -243,7 +257,7 @@ public class XMLGen {
      */
      private Element mLicensor(String displayName) throws Exception {
         if (displayName.equals(""))
-            throw new ParseException("missing DisplayName", 0);
+            reportError("missing DisplayName");
         Element licensor = dom.createElement("Licensor");
         Element dname = dom.createElement("DisplayName");
         Text tmp = dom.createTextNode(displayName);
@@ -263,7 +277,8 @@ public class XMLGen {
             eFlag.appendChild(tmp);
             return eFlag;
         default:
-            throw new ParseException("invalid ExceptionFlag", 0);
+            reportError("invalid ExceptionFlag");
+            return null;
         }
     }
  
@@ -272,7 +287,7 @@ public class XMLGen {
         String val = row[element.ordinal()];
         if (val.equals("")) {
             if (mandatory)
-                throw new ParseException("missing required value on element: " + elementName, 0);
+                reportError("missing required value on element: " + elementName);
             else
                 return null;
         }
@@ -297,39 +312,45 @@ public class XMLGen {
                     row[element.ordinal()] = m.group(1).toLowerCase();
                 }
             } else {
-                throw new ParseException("invalid LocalizationOffering value: " + loc, 0);
+                reportError("invalid LocalizationOffering value: " + loc);
             }
         }
         return mGenericElement(row, COL.LocalizationType, false);
     }
 
     private Element mCaptionsExemptionReason(String[] row, String territory) throws Exception {
+        // XXX clarify policy regarding non-US captioning
         //        if (territory.equals("US")) {  // check captions
             switch(yesorno(row[COL.CaptionIncluded.ordinal()])) {
             case 1:
                 if (!row[COL.CaptionExemption.ordinal()].equals(""))
-                    throw new ParseException("CaptionExemption specified without CaptionIncluded", 0);
-                else
-                    return null;
+                    reportError("CaptionExemption specified without CaptionIncluded");
+                break;
             case 0:
                 if (row[COL.CaptionExemption.ordinal()].equals(""))
-                    throw new ParseException("CaptionExemption not specified", 0);
-                int exemption = normalizeInt(row[COL.CaptionExemption.ordinal()]);
+                    reportError("CaptionExemption not specified");
+                int exemption;
+                try {
+                    exemption = normalizeInt(row[COL.CaptionExemption.ordinal()]);
+                } catch(NumberFormatException s) {
+                    exemption = -1;
+                }
                 if (exemption < 1 || exemption > 6)
-                    throw new ParseException("Invalid CaptionExamption Value: " + exemption, 0);
+                    reportError("Invalid CaptionExamption Value: " + exemption);
                 Element capex = dom.createElement(COL.CaptionExemption.toString());
                 Text tmp = dom.createTextNode(Integer.toString(exemption));
                 capex.appendChild(tmp);
                 return capex;
             default:
-                throw new ParseException("CaptionExemption specified without CaptionIncluded", 0);
+                reportError("CaptionExemption specified without CaptionIncluded");
             }
             // } else {
             // if (row[COL.CaptionIncluded.ordinal()].equals("") && row[COL.CaptionExemption.ordinal()].equals(""))
             //     return null;
             // else
-            //     throw new ParseException("CaptionIncluded/Exemption should only be specified in US", 0);
+            //     reportError("CaptionIncluded/Exemption should only be specified in US");
             // }
+            return null;
     }
 
     private Element mRunLength(String[] row, COL element) throws Exception {
@@ -340,19 +361,25 @@ public class XMLGen {
         Pattern dur = Pattern.compile("^\\s*(\\d{1,2}):(\\d{1,2}):(\\d{1,2})\\s*$");
         Matcher m = dur.matcher(val);
         if (m.matches()) {
-            int hour = normalizeInt(m.group(1));
-            int min = normalizeInt(m.group(2));
-            int sec = normalizeInt(m.group(3));
+            int hour, min, sec;
+            try {
+                hour = normalizeInt(m.group(1));
+                min = normalizeInt(m.group(2));
+                sec = normalizeInt(m.group(3));
+            } catch(NumberFormatException s) {
+                hour = min = sec = 60;
+            }
             if (min > 59 || sec > 59)
-                throw new ParseException("invalid duration string " + val, 0);
+                reportError("invalid duration string " + val);
             String d =  String.format("P%dH%dM%dS", hour, min, sec);
             Element ret = dom.createElement(elementName);
             Text tmp = dom.createTextNode(d);
             ret.appendChild(tmp);
             return ret;
         } else {
-            throw new ParseException("invalid duration string (verify Excel cell format is 'Text'): " + val, 0);
+            reportError("invalid duration string (verify Excel cell format is 'Text'): " + val);
         }
+        return null;
     }
 
     private void mMovieAsset(String[] row, Element asset) throws Exception {
@@ -384,7 +411,7 @@ public class XMLGen {
         if (!row[COL.ProductID.ordinal()].equals("")) { // optional field
             String productID = normalizeEIDR(row[COL.ProductID.ordinal()]);
             if (productID == null) {
-                throw new ParseException("Invalid ProductID: " + row[COL.ProductID.ordinal()], 0);
+                reportError("Invalid ProductID: " + row[COL.ProductID.ordinal()]);
             } else {
                 row[COL.ProductID.ordinal()] = productID;
             }
@@ -394,7 +421,7 @@ public class XMLGen {
         if (!row[COL.EncodeID.ordinal()].equals("")) { // optional field
             String encodeID = normalizeEIDR(row[COL.EncodeID.ordinal()]);
             if (encodeID == null) {
-                throw new ParseException("Invalid EncodeID: " + row[COL.EncodeID.ordinal()], 0);
+                reportError("Invalid EncodeID: " + row[COL.EncodeID.ordinal()]);
             } else {
                 row[COL.EncodeID.ordinal()] = encodeID;
             }
@@ -418,7 +445,7 @@ public class XMLGen {
         if (!row[COL.ReleaseYear.ordinal()].equals("")) { // optional
             String year = normalizeYear(row[COL.ReleaseYear.ordinal()]);
             if (year == null) {
-                throw new ParseException("Invalid ReleaseYear: " + row[COL.ReleaseYear.ordinal()], 0);
+                reportError("Invalid ReleaseYear: " + row[COL.ReleaseYear.ordinal()]);
             } else {
                 row[COL.ReleaseYear.ordinal()] = year;
             }
@@ -428,7 +455,7 @@ public class XMLGen {
         if (!row[COL.ReleaseHistoryOriginal.ordinal()].equals("")) { // optional
             String date = normalizeDate(row[COL.ReleaseHistoryOriginal.ordinal()]);
             if (date == null) {
-                throw new ParseException("Invalid ReleaseHistoryOriginal: " + row[COL.ReleaseHistoryOriginal.ordinal()], 0);
+                reportError("Invalid ReleaseHistoryOriginal: " + row[COL.ReleaseHistoryOriginal.ordinal()]);
             } else {
                 row[COL.ReleaseHistoryOriginal.ordinal()] = date;
             }
@@ -444,7 +471,7 @@ public class XMLGen {
         if (!row[COL.ReleaseHistoryPhysicalHV.ordinal()].equals("")) { // optional
             String date = normalizeDate(row[COL.ReleaseHistoryPhysicalHV.ordinal()]);
             if (date == null) {
-                throw new ParseException("Invalid ReleaseHistoryPhysicalHV: " + row[COL.ReleaseHistoryPhysicalHV.ordinal()], 0);
+                reportError("Invalid ReleaseHistoryPhysicalHV: " + row[COL.ReleaseHistoryPhysicalHV.ordinal()]);
             } else {
                 row[COL.ReleaseHistoryPhysicalHV.ordinal()] = date;
             }
@@ -459,7 +486,7 @@ public class XMLGen {
         // RatingSystem ---> Ratings
         if (row[COL.RatingSystem.ordinal()].equals("")) { // optional
             if (!(row[COL.RatingValue.ordinal()].equals("") && row[COL.RatingReason.ordinal()].equals("")))
-                throw new ParseException("RatingSystem not specified", 0);
+                reportError("RatingSystem not specified");
         } else {
             Element ratings = dom.createElement("Ratings");
             Element rat = dom.createElement("Rating");
@@ -493,11 +520,12 @@ public class XMLGen {
         asset.appendChild(metadata);
     } /* mMovieAsset() */
 
-    private Node  mEpisodeAsset(String[] row, Element asset) throws Exception {
+    // XXX not implemented
+    private Element  mEpisodeAsset(String[] row, Element asset) throws Exception {
         return null;
     }
 
-    private Node mAsset(String[] row) throws Exception {
+    private Element mAsset(String[] row) throws Exception {
         Comment comment = null;
         String workType = row[COL.WorkType.ordinal()];
 
@@ -509,10 +537,10 @@ public class XMLGen {
                     comment = dom.createComment("corrected from '" + workType + "'");
                     workType = m.group(1).substring(0, 1).toUpperCase() + m.group(1).substring(1).toLowerCase();
                 } else {
-                    throw new ParseException("invalid workType: " + workType, 0);
+                    reportError("invalid workType: " + workType);
                 }
             } else {
-                throw new ParseException("invalid workType: " + workType, 0);
+                reportError("invalid workType: " + workType);
             }
         }
         Element asset = dom.createElement("Asset");
@@ -529,7 +557,7 @@ public class XMLGen {
         return asset;
     } /* mAsset() */
 
-    private Node makeTextTerm(String name, String value) {
+    private Element makeTextTerm(String name, String value) {
         Element e = dom.createElement("Term");   
         Attr attr = dom.createAttribute("termName");
         attr.setValue(name);
@@ -542,7 +570,7 @@ public class XMLGen {
         return e;
     }
 
-    private Node makeDurationTerm(String name, String value) {
+    private Element makeDurationTerm(String name, String value) {
         Element e = dom.createElement("Term");   
         Attr attr = dom.createAttribute("termName");
         attr.setValue(name);
@@ -556,7 +584,7 @@ public class XMLGen {
         return e;
     }
 
-    private Node makeLanguageTerm(String name, String value) {
+    private Element makeLanguageTerm(String name, String value) {
         Element e = dom.createElement("Term");   
         Attr attr = dom.createAttribute("termName");
         attr.setValue(name);
@@ -570,7 +598,7 @@ public class XMLGen {
         return e;
     }
 
-    private Node makeEventTerm(String name, String dateTime) {
+    private Element makeEventTerm(String name, String dateTime) {
         Element e = dom.createElement("Term");   
         Attr attr = dom.createAttribute("termName");
         attr.setValue(name);
@@ -584,7 +612,7 @@ public class XMLGen {
         return e;
     }
 
-    private Node makeMoneyTerm(String name, String value, String currency) {
+    private Element makeMoneyTerm(String name, String value, String currency) {
         Element e = dom.createElement("Term");   
         Attr attr = dom.createAttribute("termName");
         attr.setValue(name);
@@ -600,14 +628,13 @@ public class XMLGen {
         return e;
     }
 
-    private Node mTransaction(String[] row) throws Exception {
+    private Element mTransaction(String[] row) throws Exception {
         Element transaction = dom.createElement("Transaction");
-        Attr attr;
         
         // LicenseType
         String val = row[COL.LicenseType.ordinal()];
         if (!val.matches("^\\s*EST|VOD|SVOD|POEST\\s*$"))
-            throw new ParseException("invalid LicenseType: " + val, 0);
+            reportError("invalid LicenseType: " + val);
         Element e = dom.createElement(COL.LicenseType.toString());
         Text tmp = dom.createTextNode(val);
         e.appendChild(tmp);
@@ -629,7 +656,7 @@ public class XMLGen {
         // XXX XML allows empty value
         val = row[COL.Start.ordinal()];
         if (val.equals("")) {
-            throw new ParseException("Missing Start date: ", 0);
+            reportError("Missing Start date: ");
             // e = dom.createElement(COL.Start.toString());
             // tmp = dom.createTextNode("Immediate");
             // e.appendChild(tmp);
@@ -637,7 +664,7 @@ public class XMLGen {
         } else {
             String date = normalizeDate(val);
             if (date == null)
-                throw new ParseException("Invalid Start date: " + row[COL.ReleaseHistoryOriginal.ordinal()], 0);
+                reportError("Invalid Start date: " + row[COL.ReleaseHistoryOriginal.ordinal()]);
             row[COL.ReleaseHistoryOriginal.ordinal()] = date;
             e = dom.createElement(COL.Start.name());  //[sic] yes name
             tmp = dom.createTextNode(date + "T00:00:00");
@@ -648,7 +675,7 @@ public class XMLGen {
         // End or EndCondition
         val = row[COL.End.ordinal()];
         if (val.equals(""))
-            throw new ParseException("End date may not be null", 0);
+            reportError("End date may not be null");
         String date = normalizeDate(val);
         if (date != null) {
             e = dom.createElement(COL.End.name());  //[sic] yes name
@@ -661,7 +688,7 @@ public class XMLGen {
             e.appendChild(tmp);
             transaction.appendChild(e);
         } else {
-            throw new ParseException("Invalid End Condition " + val, 0);
+            reportError("Invalid End Condition " + val);
         }
 
         // StoreLanguage
@@ -673,7 +700,7 @@ public class XMLGen {
         val = row[COL.LicenseRightsDescription.ordinal()];
         if (!val.equals("")) {
             if (!LRD.contains(val))
-                throw new ParseException("invalid LicenseRightsDescription " + val, 0);
+                reportError("invalid LicenseRightsDescription " + val);
             e = dom.createElement(COL.LicenseRightsDescription.toString());
             tmp = dom.createTextNode(val);
             e.appendChild(tmp);
@@ -683,7 +710,7 @@ public class XMLGen {
         // FormatProfile
         val = row[COL.FormatProfile.ordinal()];
         if (!val.matches("^\\s*SD|HD|3D\\s*$"))
-            throw new ParseException("invalid FormatProfile: " + val, 0);
+            reportError("invalid FormatProfile: " + val);
         e = dom.createElement(COL.FormatProfile.toString());
         tmp = dom.createTextNode(val);
         e.appendChild(tmp);
@@ -696,13 +723,11 @@ public class XMLGen {
         // Term(s)
         // PriceType term
         // XXX validation
-        Element e2 = null;
         val = row[COL.PriceType.ordinal()].toLowerCase();
         Pattern pat = Pattern.compile("^\\s*(tier|category|wsp|srp)\\s*$", Pattern.CASE_INSENSITIVE);
         Matcher m = pat.matcher(val);
-        String termsType = null, termName = null;
         if (!m.matches())
-            throw new ParseException("Invalid PriceType: " + val, 0);
+            reportError("Invalid PriceType: " + val);
         switch(val) {
         case "tier":
         case "category":
@@ -757,7 +782,10 @@ public class XMLGen {
         return transaction;
     }
 
-    //---------------------------------------
+    /****************************************
+     * Upper-level methods
+     ****************************************/
+
     private void availGen(String[] row) throws Exception {
         Element avail = dom.createElement("Avail");
         root.appendChild(avail);
@@ -782,7 +810,6 @@ public class XMLGen {
     }
 
     public Document makeXML(ArrayList<Object> rows) throws Exception {
-		
     	//get an instance of factory
         DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
         dbf.setValidating(true);
@@ -819,6 +846,7 @@ public class XMLGen {
 
             for (Object r : rows) {
                 String[] row = (String[]) r;
+                lineNo++;
                 availGen(row);
             }
         } catch(ParserConfigurationException pce) {

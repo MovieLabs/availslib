@@ -92,7 +92,7 @@ public class SS {
     }
 
     public SS(String file, String sheetName, Logger log) throws Exception {
-        log = this.log;
+        this.log = log;
         sheet = sheetName;
         Workbook wb = new XSSFWorkbook(new FileInputStream(file));
         Sheet sheet = wb.getSheet(sheetName);

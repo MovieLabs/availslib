@@ -40,70 +40,31 @@ public class XMLGen {
     private static final String MISSING = "---missing---";
     private Document dom;
     private Element root;
-    private boolean strict = false;
+    private boolean exitOnError;
+    private boolean cleanupData;
+    private static Logger log;
 
-    public XMLGen(boolean strict) {
-        this.strict = strict;
+    /****************************************
+     * Constructor(s)
+     ****************************************/
+
+    public XMLGen(Logger log, boolean cleanupData, boolean exitOnError) {
+        this.cleanupData = cleanupData;
+        this.exitOnError = exitOnError;
+        this.log = log;
+        
     }
 
-    private Node mALID(String availID) {
-        if (availID.equals(""))
-            availID = MISSING;
-        Text tmp = dom.createTextNode(availID);
-        Element ALID = dom.createElement("ALID");
-        ALID.appendChild(tmp);
-        return ALID;
-    }
+    /****************************************
+     * Helper methods
+     ****************************************/
 
     /**
-     * Creates an Avails/Disposition XML node
-     * @param entryType string (controlled vocabulary) indicating whether this Avail is new, and update, or a deletion
-     * @return the created XML node
+     * Parse an input string to determine whether "Yes" or "No" is intended.  A variety of case
+     * mismatches and leading/trailing whitespace are accepted.
+     * @param s the string to be tested
+     * @return 1 if "yes" was intended; 0 if "no" was intended; -1 for an invalid pattern.
      */
-    private Element mDisposition(String entryType) throws Exception {
-        Comment comment = null;
-
-        if (!(entryType.equals("Full Extract") || entryType.equals("Full Delete"))) {
-            if (strict) {
-                throw new ParseException("invalid Disposition", 0);
-            } else { // try to clean up
-                Pattern pat = Pattern.compile("^\\s*full\\s+(extract|delete)\\s*$", Pattern.CASE_INSENSITIVE);
-                Matcher m = pat.matcher(entryType);
-                if (m.matches()) {
-                    comment = dom.createComment("corrected from '" + entryType + "'");
-                    if (m.group(1).equalsIgnoreCase("extract"))
-                        entryType = "Full Extract";
-                    else if (m.group(1).equalsIgnoreCase("delete"))
-                        entryType = "Full Delete";
-                    else
-                        throw new ParseException("invalid Disposition", 0);
-                } else {
-                    throw new ParseException("invalid Disposition", 0);
-                }
-            }
-        }
-        Element disp = dom.createElement("Disposition");
-        Element entry = dom.createElement("EntryType");
-        Text tmp = dom.createTextNode(entryType);
-        entry.appendChild(tmp);
-        disp.appendChild(entry);
-        if (comment != null)
-            disp.appendChild(comment);
-        return disp;
-    }
-
-    private Node mLicensor(String displayName) throws Exception {
-        if (displayName.equals(""))
-            throw new ParseException("missing DisplayName", 0);
-        Element licensor = dom.createElement("Licensor");
-        Element dname = dom.createElement("DisplayName");
-        Text tmp = dom.createTextNode(displayName);
-        dname.appendChild(tmp);
-        licensor.appendChild(dname);
-
-        return licensor;
-    }
- 
     private int yesorno(String s) {
         if (s.equals(""))
             return 0;
@@ -121,7 +82,178 @@ public class XMLGen {
         }
     }
 
-    private Node mException(String exceptionFlag) throws Exception {
+    /**
+     * Verify that a string represents a valid EIDR, and return compact representation if so.  Leading and
+     * trailing whitespace is tolerated, as is the presence/absence of the EIDR "10.5240/" prefix
+     * @param s the input string to be tested
+     * @return a short EIDR corresponding to the asset if valid; null if not a proper EIDR exception
+     */
+    private String normalizeEIDR(String s) {
+        Pattern eidr = Pattern.compile("^\\s*(?:10\\.5240/)?((?:(?:\\p{XDigit}){4}-){5}\\p{XDigit})\\s*$");
+        Matcher m = eidr.matcher(s);
+        if (m.matches()) {
+            return m.group(1).toUpperCase();
+        } else {
+            return null;
+        }
+    }
+
+    /**
+     * Verify that a string represents a valid 4-digit year, and
+     * return a canonical representation if so.  Leading and trailing
+     * whitespace is tolerated.
+     * @param s the input string to be tested
+     * @return a 4-digit year value represented as a string
+     */
+    private String normalizeYear(String s) {
+        Pattern eidr = Pattern.compile("^\\s*(\\d{4})(?:\\.0)?\\s*$");
+        Matcher m = eidr.matcher(s);
+        if (m.matches()) {
+            return m.group(1);
+        } else {
+            return null;
+        }
+    }
+
+    private int normalizeInt(String s) throws Exception {
+        Pattern eidr = Pattern.compile("^\\s*(\\d+)(?:\\.0)?\\s*$");
+        Matcher m = eidr.matcher(s);
+        if (m.matches()) {
+            return Integer.parseInt(m.group(1));
+        } else {
+            throw new NumberFormatException(s);
+        }
+    }
+
+    private String normalizeDate(String s) {
+        final int[] dim = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+        int year=-1, month=-1, day=-1;
+        Pattern date = Pattern.compile("^\\s*(\\d{4})-(\\d{1,2})-(\\d{1,2})\\s*$");
+        Matcher m = date.matcher(s);
+        if (m.matches()) { // try yyyy-mm-dd
+            year = Integer.parseInt(m.group(1));
+            month = Integer.parseInt(m.group(2));
+            day = Integer.parseInt(m.group(3));
+        } else { // try dd-mmm-yyyy
+            date = Pattern.compile("^\\s*(\\d{1,2})-(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)-(\\d{4})\\s*$",
+                                   Pattern.CASE_INSENSITIVE);
+            m = date.matcher(s);
+            if (m.matches()) {
+                year = Integer.parseInt(m.group(3));
+                switch(m.group(2).toLowerCase()) {
+                case "jan": month =  1; break;
+                case "feb": month =  2; break;
+                case "mar": month =  3; break;
+                case "apr": month =  4; break;
+                case "may": month =  5; break;
+                case "jun": month =  6; break;
+                case "jul": month =  7; break;
+                case "aug": month =  8; break;
+                case "sep": month =  9; break;
+                case "oct": month = 10; break;
+                case "nov": month = 11; break;
+                case "dec": month = 12; break;
+                }
+                day = Integer.parseInt(m.group(1));
+            } else {
+                return null;
+            }
+        }
+        boolean badDate = year < 1850;
+        badDate |= month < 1 || month > 12;
+        badDate |= day < 1;
+        if (month == 2) {  // February
+            if ((year % 4) == 0) { // leap year: fails in year 2400
+                if ((year % 100) == 0) {
+                    badDate |= day > 28; // first-order exception to leap year rule
+                } else {
+                    badDate |= day > 29; // normal leap year
+                }
+            } else {
+                badDate |= day > dim[1]; // non-leap year
+            }
+        } else {
+            badDate |= day > dim[month-1];
+        }
+        if (badDate)
+            return null;
+        else
+            return String.format("%04d-%02d-%02d", year, month, day);
+    }
+
+    /****************************************
+     * Node-generating methods
+     ****************************************/
+
+    /**
+     * Creates an Avails/ALID XML node
+     * @param availID the value of the ALID
+     * @return the generated XML element
+     */
+    private Element mALID(String availID) {
+        if (availID.equals(""))
+            availID = MISSING;
+        Text tmp = dom.createTextNode(availID);
+        Element ALID = dom.createElement("ALID");
+        ALID.appendChild(tmp);
+        return ALID;
+    }
+
+    /**
+     * Creates an Avails/Disposition XML node
+     * @param entryType string (controlled vocabulary) indicating whether this Avail is new, and update,
+     *        or a deletion
+     * @return the created XML node
+     */
+    private Element mDisposition(String entryType) throws Exception {
+        Comment comment = null;
+
+        if (!(entryType.equals("Full Extract") || entryType.equals("Full Delete"))) {
+            if (cleanupData) {
+                Pattern pat = Pattern.compile("^\\s*full\\s+(extract|delete)\\s*$", Pattern.CASE_INSENSITIVE);
+                Matcher m = pat.matcher(entryType);
+                if (m.matches()) {
+                    comment = dom.createComment("corrected from '" + entryType + "'");
+                    if (m.group(1).equalsIgnoreCase("extract"))
+                        entryType = "Full Extract";
+                    else if (m.group(1).equalsIgnoreCase("delete"))
+                        entryType = "Full Delete";
+                    else
+                        throw new ParseException("invalid Disposition", 0);
+                } else {
+                    throw new ParseException("invalid Disposition", 0);
+                }
+            } else {
+                throw new ParseException("invalid Disposition", 0);
+            }
+        }
+        Element disp = dom.createElement("Disposition");
+        Element entry = dom.createElement("EntryType");
+        Text tmp = dom.createTextNode(entryType);
+        entry.appendChild(tmp);
+        disp.appendChild(entry);
+        if (comment != null)
+            disp.appendChild(comment);
+        return disp;
+    }
+
+
+    /**
+     * Create an Avails/Licensor XML element, and populate with the DisplayName
+     */
+     private Element mLicensor(String displayName) throws Exception {
+        if (displayName.equals(""))
+            throw new ParseException("missing DisplayName", 0);
+        Element licensor = dom.createElement("Licensor");
+        Element dname = dom.createElement("DisplayName");
+        Text tmp = dom.createTextNode(displayName);
+        dname.appendChild(tmp);
+        licensor.appendChild(dname);
+
+        return licensor;
+    }
+ 
+    private Element mException(String exceptionFlag) throws Exception {
         switch(yesorno(exceptionFlag)) {
         case 0:
             return null;
@@ -157,15 +289,15 @@ public class XMLGen {
         if (loc.equals(""))
             return null;
         if (!(loc.equals("sub") || loc.equals("dub") || loc.equals("subdub") || loc.equals("any"))) {
-            if (strict) {
-                throw new ParseException("invalid LocalizationOffering value: " + loc, 0);
-            } else {
+            if (cleanupData) {
                 Pattern pat = Pattern.compile("^\\s*(sub|dub|subdub|any)\\s*$", Pattern.CASE_INSENSITIVE);
                 Matcher m = pat.matcher(loc);
                 if (m.matches()) {
                     cmt[0] = "corrected from '" + loc + "'";
                     row[element.ordinal()] = m.group(1).toLowerCase();
                 }
+            } else {
+                throw new ParseException("invalid LocalizationOffering value: " + loc, 0);
             }
         }
         return mGenericElement(row, COL.LocalizationType, false);
@@ -221,92 +353,6 @@ public class XMLGen {
         } else {
             throw new ParseException("invalid duration string (verify Excel cell format is 'Text'): " + val, 0);
         }
-    }
-
-    private String normalizeEIDR(String s) {
-        Pattern eidr = Pattern.compile("^\\s*(?:10\\.5240/)?((?:(?:\\p{XDigit}){4}-){5}\\p{XDigit})\\s*$");
-        Matcher m = eidr.matcher(s);
-        if (m.matches()) {
-            return m.group(1).toUpperCase();
-        } else {
-            return null;
-        }
-    }
-
-    private String normalizeYear(String s) {
-        Pattern eidr = Pattern.compile("^\\s*(\\d{4})(?:\\.0)?\\s*$");
-        Matcher m = eidr.matcher(s);
-        if (m.matches()) {
-            return m.group(1);
-        } else {
-            return null;
-        }
-    }
-
-    private int normalizeInt(String s) throws Exception {
-        Pattern eidr = Pattern.compile("^\\s*(\\d+)(?:\\.0)?\\s*$");
-        Matcher m = eidr.matcher(s);
-        if (m.matches()) {
-            return Integer.parseInt(m.group(1));
-        } else {
-            throw new NumberFormatException(s);
-        }
-    }
-
-    private String normalizeDate(String s) throws Exception {
-        final int[] dim = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-        int year=-1, month=-1, day=-1;
-        Pattern date = Pattern.compile("^\\s*(\\d{4})-(\\d{1,2})-(\\d{1,2})\\s*$");
-        Matcher m = date.matcher(s);
-        if (m.matches()) { // try yyyy-mm-dd
-            year = Integer.parseInt(m.group(1));
-            month = Integer.parseInt(m.group(2));
-            day = Integer.parseInt(m.group(3));
-        } else { // try dd-mmm-yyyy
-            date = Pattern.compile("^\\s*(\\d{1,2})-(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)-(\\d{4})\\s*$",
-                                   Pattern.CASE_INSENSITIVE);
-            m = date.matcher(s);
-            if (m.matches()) {
-                year = Integer.parseInt(m.group(3));
-                switch(m.group(2).toLowerCase()) {
-                case "jan": month =  1; break;
-                case "feb": month =  2; break;
-                case "mar": month =  3; break;
-                case "apr": month =  4; break;
-                case "may": month =  5; break;
-                case "jun": month =  6; break;
-                case "jul": month =  7; break;
-                case "aug": month =  8; break;
-                case "sep": month =  9; break;
-                case "oct": month = 10; break;
-                case "nov": month = 11; break;
-                case "dec": month = 12; break;
-                }
-                day = Integer.parseInt(m.group(1));
-            } else {
-                return null;
-            }
-        }
-        boolean badDate = year < 1850;
-        badDate |= month < 1 || month > 12;
-        badDate |= day < 1;
-        if (month == 2) {  // February
-            if ((year % 4) == 0) { // leap year: fails in year 2400
-                if ((year % 100) == 0) {
-                    badDate |= day > 28; // first-order exception to leap year rule
-                } else {
-                    badDate |= day > 29; // normal leap year
-                }
-            } else {
-                badDate |= day > dim[1]; // non-leap year
-            }
-        } else {
-            badDate |= day > dim[month-1];
-        }
-        if (badDate)
-            return null;
-        else
-            return String.format("%04d-%02d-%02d", year, month, day);
     }
 
     private void mMovieAsset(String[] row, Element asset) throws Exception {
@@ -456,16 +502,17 @@ public class XMLGen {
         String workType = row[COL.WorkType.ordinal()];
 
         if (!(workType.equals("Movie") || workType.equals("Episode"))) {
-            if (strict) {
-                throw new ParseException("invalid workType: " + workType, 0);
-            } else {
+            if (cleanupData) {
                 Pattern pat = Pattern.compile("^\\s*(movie|episode)\\s*$", Pattern.CASE_INSENSITIVE);
                 Matcher m = pat.matcher(workType);
                 if (m.matches()) {
                     comment = dom.createComment("corrected from '" + workType + "'");
                     workType = m.group(1).substring(0, 1).toUpperCase() + m.group(1).substring(1).toLowerCase();
+                } else {
+                    throw new ParseException("invalid workType: " + workType, 0);
                 }
-                else throw new ParseException("invalid workType: " + workType, 0);
+            } else {
+                throw new ParseException("invalid workType: " + workType, 0);
             }
         }
         Element asset = dom.createElement("Asset");
@@ -734,7 +781,7 @@ public class XMLGen {
 
     }
 
-    public void makeXML(ArrayList<Object> rows) throws Exception {
+    public Document makeXML(ArrayList<Object> rows) throws Exception {
 		
     	//get an instance of factory
         DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
@@ -774,22 +821,31 @@ public class XMLGen {
                 String[] row = (String[]) r;
                 availGen(row);
             }
+        } catch(ParserConfigurationException pce) {
+            //dump it
+            System.out.println("Error while trying to instantiate DocumentBuilder " + pce);
+            System.exit(1);
+        }
 
+        return dom;
+
+    }
+
+    public void makeXMLFile(ArrayList<Object> rows, String xmlFile) throws Exception {
+        try {
+            dom = makeXML(rows);
+            
             // Use a Transformer for output
             TransformerFactory tFactory = TransformerFactory.newInstance();
             Transformer transformer = tFactory.newTransformer();
             transformer.setOutputProperty(OutputKeys.INDENT, "yes");
             transformer.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "4");
-
+            
             DOMSource source = new DOMSource(dom);
             //StreamResult result = new StreamResult(System.out);
-            StreamResult result = new StreamResult(new FileOutputStream("testout.xml"));
+            StreamResult result = new StreamResult(new FileOutputStream(xmlFile));
             transformer.transform(source, result);
 
-        } catch(ParserConfigurationException pce) {
-            //dump it
-            System.out.println("Error while trying to instantiate DocumentBuilder " + pce);
-            System.exit(1);
         } catch (TransformerConfigurationException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
@@ -801,4 +857,6 @@ public class XMLGen {
             e.printStackTrace();
         }
     }
-}
+} /* Class XMLGen */
+
+

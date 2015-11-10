@@ -2,7 +2,7 @@ package com.movielabs.avails;
 
 import java.io.FileInputStream;
 import java.util.*;
-
+import org.apache.logging.log4j.*;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -72,8 +72,10 @@ public class SS {
         }
     }
 
-
+    private Logger log;
     private String sheet;
+    private boolean clean;
+    private boolean wx;
     private ArrayList<Object> rows;
 
     private boolean isAvail(String[] row) {
@@ -83,13 +85,14 @@ public class SS {
         return ret;
     }
 
-    public void toXML(boolean strict) throws Exception
+    public void toXML(boolean clean, boolean wx, String outFile) throws Exception
     {
-        XMLGen xml = new XMLGen(strict);
-        xml.makeXML(rows);
+        XMLGen xml = new XMLGen(log, clean, wx);
+        xml.makeXMLFile(rows, outFile);
     }
 
-    public SS(String file, String sheetName) throws Exception {
+    public SS(String file, String sheetName, Logger log) throws Exception {
+        log = this.log;
         sheet = sheetName;
         Workbook wb = new XSSFWorkbook(new FileInputStream(file));
         Sheet sheet = wb.getSheet(sheetName);

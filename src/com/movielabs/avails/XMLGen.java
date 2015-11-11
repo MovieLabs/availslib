@@ -391,30 +391,33 @@ public class XMLGen {
     private Element mRunLength(String[] row, COL element) throws Exception {
         String elementName = element.toString();
         String val = row[element.ordinal()];
-        if (val.equals(""))
-            return null;
-        Pattern dur = Pattern.compile("^\\s*(\\d{1,2}):(\\d{1,2}):(\\d{1,2})\\s*$");
-        Matcher m = dur.matcher(val);
-        if (m.matches()) {
-            int hour, min, sec;
-            try {
-                hour = normalizeInt(m.group(1));
-                min = normalizeInt(m.group(2));
-                sec = normalizeInt(m.group(3));
-            } catch(NumberFormatException s) {
-                hour = min = sec = 60;
-            }
-            if (min > 59 || sec > 59)
-                reportError("invalid duration string " + val);
-            String d =  String.format("PT%dH%dM%dS", hour, min, sec);
-            Element ret = dom.createElement(elementName);
-            Text tmp = dom.createTextNode(d);
-            ret.appendChild(tmp);
-            return ret;
+        Element ret = dom.createElement(elementName);
+        Text tmp = null;
+        if (val.equals("")) { // XXX ugly hack
+            tmp = dom.createTextNode("PT0H");
         } else {
-            reportError("invalid duration string (verify Excel cell format is 'Text'): " + val);
+            Pattern dur = Pattern.compile("^\\s*(\\d{1,2}):(\\d{1,2}):(\\d{1,2})\\s*$");
+            Matcher m = dur.matcher(val);
+            if (m.matches()) {
+                int hour, min, sec;
+                try {
+                    hour = normalizeInt(m.group(1));
+                    min = normalizeInt(m.group(2));
+                    sec = normalizeInt(m.group(3));
+                } catch(NumberFormatException s) {
+                    hour = min = sec = 60;
+                }
+                if (min > 59 || sec > 59)
+                    reportError("invalid duration string " + val);
+                String d =  String.format("PT%dH%dM%dS", hour, min, sec);
+                tmp = dom.createTextNode(d);
+            } else {
+                reportError("invalid duration string (verify Excel cell format is 'Text'): " + val);
+                ret = null;
+            }
         }
-        return null;
+        ret.appendChild(tmp);
+        return ret;
     }
 
     /**
@@ -469,6 +472,9 @@ public class XMLGen {
         String territory = row[COL.Territory.ordinal()];
 
         // TitleDisplayUnlimited
+        // XXX this is Optional in SS, Required in XML; workaround by assigning it internal alias value
+        if (row[COL.TitleDisplayUnlimited.ordinal()].equals(""))
+            row[COL.TitleDisplayUnlimited.ordinal()] = row[COL.TitleInternalAlias.ordinal()];
         if ((e = mGenericElement(row, COL.TitleDisplayUnlimited, false)) != null)
             metadata.appendChild(e);
         // TitleInternalAlias
@@ -507,7 +513,8 @@ public class XMLGen {
             }
             metadata.appendChild(mGenericElement(row, COL.ReleaseYear, false));
         }
-        // TotalRunTime
+        // TotalRunTime --> RunLength
+        // XXX TotalRunTime is optional, RunLength is required
         if ((e = mRunLength(row, COL.TotalRunTime)) != null) {
             metadata.appendChild(e);
         }
@@ -629,7 +636,16 @@ public class XMLGen {
         return e;
     }
 
-    private Element makeDurationTerm(String name, String value) {
+    private Element makeDurationTerm(String name, String value) throws Exception {
+        int hours;
+        try {
+            hours = normalizeInt(value);
+        } catch(NumberFormatException e) {
+            reportError(" invalid duration: " + value);
+            return null;
+        }
+        value = String.format("PT%dH", hours);
+            
         Element e = dom.createElement("Term");   
         Attr attr = dom.createAttribute("termName");
         attr.setValue(name);
@@ -644,6 +660,7 @@ public class XMLGen {
     }
 
     private Element makeLanguageTerm(String name, String value) {
+        // XXX validate
         Element e = dom.createElement("Term");   
         Attr attr = dom.createAttribute("termName");
         attr.setValue(name);
@@ -813,13 +830,16 @@ public class XMLGen {
         // RentalDuration Term
         val = row[COL.RentalDuration.ordinal()];
         if (!val.equals("")) {
-            transaction.appendChild(makeDurationTerm(COL.RentalDuration.toString(), val));
+            if ((e = makeDurationTerm(COL.RentalDuration.toString(), val)) != null)
+                transaction.appendChild(e);
         }
 
         // WatchDuration Term
         val = row[COL.WatchDuration.ordinal()];
         if (!val.equals("")) {
-            transaction.appendChild(makeDurationTerm(COL.WatchDuration.toString(), val));
+            if ((e = makeDurationTerm(COL.WatchDuration.toString(), val)) != null)
+            if (e != null)
+                transaction.appendChild(e);
         }
 
         // HoldbackLanguage Term

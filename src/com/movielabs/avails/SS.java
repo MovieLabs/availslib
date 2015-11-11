@@ -44,7 +44,7 @@ public class SS {
         ReleaseHistoryPhysicalHV ("md:Date"),
         ExceptionFlag ("ExceptionFlag"),
         RatingSystem ("md:System"),
-        RatingValue ("md:RatingValue"),
+        RatingValue ("md:Value"),
         RatingReason ("md:RatingReason"),
         RentalDuration ("RentalDuration"),
         WatchDuration ("WatchDuration"),

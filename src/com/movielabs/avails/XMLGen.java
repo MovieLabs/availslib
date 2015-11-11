@@ -44,8 +44,10 @@ public class XMLGen {
     private boolean cleanupData;
     private static Logger log;
     private int lineNo;
+    private String workType = null;
+    private String shortDesc = "";
 
-    /****************************************
+    /* **************************************
      * Constructor(s)
      ****************************************/
 
@@ -55,12 +57,16 @@ public class XMLGen {
         this.log = log;
     }
 
-    /****************************************
+    /* **************************************
      * Helper methods
      ****************************************/
 
     /**
-     * 
+     * logs an error and potentially throws an exception.  The error
+     * is decorated with the current Sheet name and the row being
+     * processed
+     * @param s the error message
+     * @throws ParseException if exit-on-error policy is in effect
      */
     void reportError(String s) throws Exception {
         s = String.format("Line %05d: %s", lineNo, s);
@@ -192,7 +198,7 @@ public class XMLGen {
             return String.format("%04d-%02d-%02d", year, month, day);
     }
 
-    /****************************************
+    /* **************************************
      * Node-generating methods
      ****************************************/
 
@@ -215,6 +221,7 @@ public class XMLGen {
      * @param entryType string (controlled vocabulary) indicating whether this Avail is new, and update,
      *        or a deletion
      * @return the created XML node
+     * @throws ParseException if there is an error and abort-on-error policy is in effect
      */
     private Element mDisposition(String entryType) throws Exception {
         Comment comment = null;
@@ -253,21 +260,40 @@ public class XMLGen {
 
 
     /**
-     * Create an Avails/Licensor XML element, and populate with the DisplayName
+     * Create an Avails Licensor XML element with a md:DisplayName element child, and populate thei latter 
+     * with the DisplayName 
+     * @param displayName the name to be held in the DisplayName child node of Licensor
+     * @return the created Licensor element
+     * @throws ParseException if there is an error and abort-on-error policy is in effect
      */
      private Element mLicensor(String displayName) throws Exception {
         if (displayName.equals(""))
-            reportError("missing DisplayName");
+            reportError("missing md:DisplayName");
         Element licensor = dom.createElement("Licensor");
-        Element dname = dom.createElement("DisplayName");
+        Element e = dom.createElement("md:DisplayName");
         Text tmp = dom.createTextNode(displayName);
-        dname.appendChild(tmp);
-        licensor.appendChild(dname);
+        e.appendChild(tmp);
+        licensor.appendChild(e);
+        // XXX ContactInfo mandatory but can't get this info from the spreadsheet
+        e = dom.createElement("mdmec:ContactInfo");
+        Element e2 = dom.createElement("md:Name");
+        e.appendChild(e2);
+        e2 = dom.createElement("md:PrimaryEmail");
+        e.appendChild(e2);
+        licensor.appendChild(e);
 
         return licensor;
     }
  
-    private Element mException(String exceptionFlag) throws Exception {
+    /**
+     * Create an Avails ExceptionFlag element
+     * @param exceptionFlag a string indicating whether the flag is to be set.  It should be "Yes" or "No",
+     *        but several case and whitespace variants will be tolerated.
+     * @return the created ExceptionFlag element, or null if there is an error
+     * @throws ParseException if the supplied value can't be mapped to
+     * a boolean and abort-on-error policy is in effect
+     */
+    private Element mExceptionFlag(String exceptionFlag) throws Exception {
         switch(yesorno(exceptionFlag)) {
         case 0:
             return null;
@@ -282,6 +308,15 @@ public class XMLGen {
         }
     }
  
+    /**
+     * Create an element based on a spreadsheet column
+     * @param row an array containing the values of a spreadsheet row
+     * @param element an index to the desired column.  The string value of this enum will be used to create the XML node, 
+     *        and the ordinal value of the enum will be used to fetch the value of the column that is stored in the node
+     * @param mandatory if true, indicates this is a required field, and if it is null an error will be reported
+     * @return the created element, or null if there is an error
+     * @throws ParseException if there is an error and abort-on-error policy is in effect
+     */
     private Element mGenericElement(String[] row, COL element, boolean mandatory) throws Exception {
         String elementName = element.toString();
         String val = row[element.ordinal()];
@@ -371,7 +406,7 @@ public class XMLGen {
             }
             if (min > 59 || sec > 59)
                 reportError("invalid duration string " + val);
-            String d =  String.format("P%dH%dM%dS", hour, min, sec);
+            String d =  String.format("PT%dH%dM%dS", hour, min, sec);
             Element ret = dom.createElement(elementName);
             Text tmp = dom.createTextNode(d);
             ret.appendChild(tmp);
@@ -382,152 +417,16 @@ public class XMLGen {
         return null;
     }
 
-    private void mMovieAsset(String[] row, Element asset) throws Exception {
-        Element e;
-        String contentID = row[COL.ContentID.ordinal()];
-        if (contentID.equals(""))
-            contentID = MISSING;
-        Attr attr = dom.createAttribute(COL.ContentID.name());
-        attr.setValue(contentID);
-        asset.setAttributeNode(attr);
-        Element metadata = dom.createElement("Metadata");
-        String territory = row[COL.Territory.ordinal()];
-
-        // TitleInternalAlias
-        metadata.appendChild(mGenericElement(row, COL.TitleInternalAlias, true));
-        // TitleDisplayUnlimited
-        if ((e = mGenericElement(row, COL.TitleDisplayUnlimited, false)) != null)
-            metadata.appendChild(e);
-        // LocalizationType --> LocalizationOffering
-        String[] cmt = new String[1];
-        if ((e = mLocalizationType(row, COL.LocalizationType, cmt)) != null) {
-            if (!cmt[0].equals("")) {
-                Comment comment = dom.createComment(cmt[0]);
-                metadata.appendChild(comment);
-            }
-            metadata.appendChild(e);
-        }
-        // ProductID --> EditEIDR-S
-        if (!row[COL.ProductID.ordinal()].equals("")) { // optional field
-            String productID = normalizeEIDR(row[COL.ProductID.ordinal()]);
-            if (productID == null) {
-                reportError("Invalid ProductID: " + row[COL.ProductID.ordinal()]);
-            } else {
-                row[COL.ProductID.ordinal()] = productID;
-            }
-            metadata.appendChild(mGenericElement(row, COL.ProductID, false));
-        }
-        // EncodeID --> EditEIDR-S
-        if (!row[COL.EncodeID.ordinal()].equals("")) { // optional field
-            String encodeID = normalizeEIDR(row[COL.EncodeID.ordinal()]);
-            if (encodeID == null) {
-                reportError("Invalid EncodeID: " + row[COL.EncodeID.ordinal()]);
-            } else {
-                row[COL.EncodeID.ordinal()] = encodeID;
-            }
-            metadata.appendChild(mGenericElement(row, COL.EncodeID, false));
-        }
-        // AltID --> AltIdentifier
-        if (!row[COL.AltID.ordinal()].equals("")) { // optional
-            Element altID = dom.createElement("AltIdentifier");
-            Element cid = dom.createElement("Namespace");
-            Text tmp = dom.createTextNode(MISSING);
-            cid.appendChild(tmp);
-            altID.appendChild(cid);
-            altID.appendChild(mGenericElement(row, COL.AltID, false));
-            Element loc = dom.createElement("Location");
-            tmp = dom.createTextNode(MISSING);
-            loc.appendChild(tmp);
-            altID.appendChild(loc);
-            metadata.appendChild(altID);
-        }
-        // ReleaseYear ---> ReleaseDate
-        if (!row[COL.ReleaseYear.ordinal()].equals("")) { // optional
-            String year = normalizeYear(row[COL.ReleaseYear.ordinal()]);
-            if (year == null) {
-                reportError("Invalid ReleaseYear: " + row[COL.ReleaseYear.ordinal()]);
-            } else {
-                row[COL.ReleaseYear.ordinal()] = year;
-            }
-            metadata.appendChild(mGenericElement(row, COL.ReleaseYear, false));
-        }
-        // ReleaseHistoryOriginal ---> ReleaseHistory/Date
-        if (!row[COL.ReleaseHistoryOriginal.ordinal()].equals("")) { // optional
-            String date = normalizeDate(row[COL.ReleaseHistoryOriginal.ordinal()]);
-            if (date == null) {
-                reportError("Invalid ReleaseHistoryOriginal: " + row[COL.ReleaseHistoryOriginal.ordinal()]);
-            } else {
-                row[COL.ReleaseHistoryOriginal.ordinal()] = date;
-            }
-            Element rh = dom.createElement("ReleaseHistory");
-            Element rt = dom.createElement("ReleaseType");
-            Text tmp = dom.createTextNode("original");
-            rt.appendChild(tmp);
-            rh.appendChild(rt);
-            rh.appendChild(mGenericElement(row, COL.ReleaseHistoryOriginal, false));
-            metadata.appendChild(rh);
-        }
-        // ReleaseHistoryPhysicalHV ---> ReleaseHistory/Date
-        if (!row[COL.ReleaseHistoryPhysicalHV.ordinal()].equals("")) { // optional
-            String date = normalizeDate(row[COL.ReleaseHistoryPhysicalHV.ordinal()]);
-            if (date == null) {
-                reportError("Invalid ReleaseHistoryPhysicalHV: " + row[COL.ReleaseHistoryPhysicalHV.ordinal()]);
-            } else {
-                row[COL.ReleaseHistoryPhysicalHV.ordinal()] = date;
-            }
-            Element rh = dom.createElement("ReleaseHistory");
-            Element rt = dom.createElement("ReleaseType");
-            Text tmp = dom.createTextNode("DVD");
-            rt.appendChild(tmp);
-            rh.appendChild(rt);
-            rh.appendChild(mGenericElement(row, COL.ReleaseHistoryPhysicalHV, false));
-            metadata.appendChild(rh);
-        }
-        // RatingSystem ---> Ratings
-        if (row[COL.RatingSystem.ordinal()].equals("")) { // optional
-            if (!(row[COL.RatingValue.ordinal()].equals("") && row[COL.RatingReason.ordinal()].equals("")))
-                reportError("RatingSystem not specified");
-        } else {
-            Element ratings = dom.createElement("Ratings");
-            Element rat = dom.createElement("Rating");
-            ratings.appendChild(rat);
-            Comment comment = dom.createComment("Ratings Region derived from Spreadsheet Territory value");
-            rat.appendChild(comment);
-            Element region = dom.createElement("Region");
-            Text tmp = dom.createTextNode(territory);
-            region.appendChild(tmp);
-            rat.appendChild(region);
-            rat.appendChild(mGenericElement(row, COL.RatingSystem, true));
-            rat.appendChild(mGenericElement(row, COL.RatingValue, true));
-            Element reason = mGenericElement(row, COL.RatingReason, false);
-            if (reason != null)
-                rat.appendChild(reason);
-            metadata.appendChild(ratings);
-        }
-        // CaptionIncluded/CaptionException
-        if ((e = mCaptionsExemptionReason(row, territory)) != null) {
-            if (!territory.equals("US")) {
-                Comment comment = dom.createComment("Exemption reason specified for non-US territory");
-                metadata.appendChild(comment);
-            }
-            metadata.appendChild(e);
-        }
-        // TotalRunTime
-        if ((e = mRunLength(row, COL.TotalRunTime)) != null) {
-            metadata.appendChild(e);
-        }
-        // Attach generated Metadata node
-        asset.appendChild(metadata);
-    } /* mMovieAsset() */
-
-    // XXX not implemented
-    private Element  mEpisodeAsset(String[] row, Element asset) throws Exception {
-        return null;
-    }
-
-    private Element mAsset(String[] row) throws Exception {
+    /**
+     * Create an AvailType element
+     * @param row an array containing the values of a spreadsheet row
+     * @parent element that this element will be a child of
+     * @return the created XML element
+     * @throws ParseException if there is an error and abort-on-error policy is in effect
+     */
+    private Element mAvailType(String[] row, Element parent) throws Exception {
+        workType = row[COL.WorkType.ordinal()];
         Comment comment = null;
-        String workType = row[COL.WorkType.ordinal()];
 
         if (!(workType.equals("Movie") || workType.equals("Episode"))) {
             if (cleanupData) {
@@ -543,9 +442,169 @@ public class XMLGen {
                 reportError("invalid workType: " + workType);
             }
         }
-        Element asset = dom.createElement("Asset");
+        Element e = dom.createElement("AvailType");
         if (comment != null)
-            asset.appendChild(comment);
+            parent.appendChild(comment);
+        Text tmp = dom.createTextNode(workType);
+        e.appendChild(tmp);
+        return e;
+    }
+
+    private Element mShortDescription() {
+        Element e = dom.createElement("ShortDescription");
+        Text tmp = dom.createTextNode(shortDesc);
+        e.appendChild(tmp);
+        return e;
+    }
+
+    private void mMovieAsset(String[] row, Element asset) throws Exception {
+        Element e;
+        String contentID = row[COL.ContentID.ordinal()];
+        if (contentID.equals(""))
+            contentID = MISSING;
+        Attr attr = dom.createAttribute(COL.ContentID.toString());
+        attr.setValue(contentID);
+        asset.setAttributeNode(attr);
+        Element metadata = dom.createElement("Metadata");
+        String territory = row[COL.Territory.ordinal()];
+
+        // TitleDisplayUnlimited
+        if ((e = mGenericElement(row, COL.TitleDisplayUnlimited, false)) != null)
+            metadata.appendChild(e);
+        // TitleInternalAlias
+        metadata.appendChild(mGenericElement(row, COL.TitleInternalAlias, true));
+        // ProductID --> EditEIDR-S
+        if (!row[COL.ProductID.ordinal()].equals("")) { // optional field
+            String productID = normalizeEIDR(row[COL.ProductID.ordinal()]);
+            if (productID == null) {
+                reportError("Invalid ProductID: " + row[COL.ProductID.ordinal()]);
+            } else {
+                row[COL.ProductID.ordinal()] = productID;
+            }
+            metadata.appendChild(mGenericElement(row, COL.ProductID, false));
+        }
+        // AltID --> AltIdentifier
+        if (!row[COL.AltID.ordinal()].equals("")) { // optional
+            Element altID = dom.createElement("AltIdentifier");
+            Element cid = dom.createElement("md:Namespace");
+            Text tmp = dom.createTextNode(MISSING);
+            cid.appendChild(tmp);
+            altID.appendChild(cid);
+            altID.appendChild(mGenericElement(row, COL.AltID, false));
+            Element loc = dom.createElement("md:Location");
+            tmp = dom.createTextNode(MISSING);
+            loc.appendChild(tmp);
+            altID.appendChild(loc);
+            metadata.appendChild(altID);
+        }
+        // ReleaseYear ---> ReleaseDate
+        if (!row[COL.ReleaseYear.ordinal()].equals("")) { // optional
+            String year = normalizeYear(row[COL.ReleaseYear.ordinal()]);
+            if (year == null) {
+                reportError("Invalid ReleaseYear: " + row[COL.ReleaseYear.ordinal()]);
+            } else {
+                row[COL.ReleaseYear.ordinal()] = year;
+            }
+            metadata.appendChild(mGenericElement(row, COL.ReleaseYear, false));
+        }
+        // TotalRunTime
+        if ((e = mRunLength(row, COL.TotalRunTime)) != null) {
+            metadata.appendChild(e);
+        }
+        // ReleaseHistoryOriginal ---> ReleaseHistory/Date
+        if (!row[COL.ReleaseHistoryOriginal.ordinal()].equals("")) { // optional
+            String date = normalizeDate(row[COL.ReleaseHistoryOriginal.ordinal()]);
+            if (date == null) {
+                reportError("Invalid ReleaseHistoryOriginal: " + row[COL.ReleaseHistoryOriginal.ordinal()]);
+            } else {
+                row[COL.ReleaseHistoryOriginal.ordinal()] = date;
+            }
+            Element rh = dom.createElement("ReleaseHistory");
+            Element rt = dom.createElement("md:ReleaseType");
+            Text tmp = dom.createTextNode("original");
+            rt.appendChild(tmp);
+            rh.appendChild(rt);
+            rh.appendChild(mGenericElement(row, COL.ReleaseHistoryOriginal, false));
+            metadata.appendChild(rh);
+        }
+        // ReleaseHistoryPhysicalHV ---> ReleaseHistory/Date
+        if (!row[COL.ReleaseHistoryPhysicalHV.ordinal()].equals("")) { // optional
+            String date = normalizeDate(row[COL.ReleaseHistoryPhysicalHV.ordinal()]);
+            if (date == null) {
+                reportError("Invalid ReleaseHistoryPhysicalHV: " + row[COL.ReleaseHistoryPhysicalHV.ordinal()]);
+            } else {
+                row[COL.ReleaseHistoryPhysicalHV.ordinal()] = date;
+            }
+            Element rh = dom.createElement("ReleaseHistory");
+            Element rt = dom.createElement("md:ReleaseType");
+            Text tmp = dom.createTextNode("DVD");
+            rt.appendChild(tmp);
+            rh.appendChild(rt);
+            rh.appendChild(mGenericElement(row, COL.ReleaseHistoryPhysicalHV, false));
+            metadata.appendChild(rh);
+        }
+        // CaptionIncluded/CaptionException
+        if ((e = mCaptionsExemptionReason(row, territory)) != null) {
+            if (!territory.equals("US")) {
+                Comment comment = dom.createComment("Exemption reason specified for non-US territory");
+                metadata.appendChild(comment);
+            }
+            metadata.appendChild(e);
+        }
+        // RatingSystem ---> Ratings
+        if (row[COL.RatingSystem.ordinal()].equals("")) { // optional
+            if (!(row[COL.RatingValue.ordinal()].equals("") && row[COL.RatingReason.ordinal()].equals("")))
+                reportError("RatingSystem not specified");
+        } else {
+            Element ratings = dom.createElement("Ratings");
+            Element rat = dom.createElement("md:Rating");
+            ratings.appendChild(rat);
+            Comment comment = dom.createComment("Ratings Region derived from Spreadsheet Territory value");
+            rat.appendChild(comment);
+            Element region = dom.createElement("md:Region");
+            // XXX validate country
+            Element country = dom.createElement("md:country");
+            region.appendChild(country);
+            Text tmp = dom.createTextNode(territory);
+            country.appendChild(tmp);
+            rat.appendChild(region);
+            rat.appendChild(mGenericElement(row, COL.RatingSystem, true));
+            rat.appendChild(mGenericElement(row, COL.RatingValue, true));
+            Element reason = mGenericElement(row, COL.RatingReason, false);
+            if (reason != null)
+                rat.appendChild(reason);
+            metadata.appendChild(ratings);
+        }
+        // EncodeID --> EditEIDR-S
+        if (!row[COL.EncodeID.ordinal()].equals("")) { // optional field
+            String encodeID = normalizeEIDR(row[COL.EncodeID.ordinal()]);
+            if (encodeID == null) {
+                reportError("Invalid EncodeID: " + row[COL.EncodeID.ordinal()]);
+            } else {
+                row[COL.EncodeID.ordinal()] = encodeID;
+            }
+            metadata.appendChild(mGenericElement(row, COL.EncodeID, false));
+        }
+        // LocalizationType --> LocalizationOffering
+        String[] cmt = new String[1];
+        if ((e = mLocalizationType(row, COL.LocalizationType, cmt)) != null) {
+            if (!cmt[0].equals("")) {
+                Comment comment = dom.createComment(cmt[0]);
+                metadata.appendChild(comment);
+            }
+            metadata.appendChild(e);
+        }
+        // Attach generated Metadata node
+        asset.appendChild(metadata);
+    } /* mMovieAsset() */
+
+    // XXX not implemented
+    private Element  mEpisodeAsset(String[] row, Element asset) throws Exception {
+        return null;
+    }
+
+    private Element mAsset(String[] row) throws Exception {
+        Element asset = dom.createElement("Asset");
         Element wt = dom.createElement("WorkType");
         Text tmp = dom.createTextNode(workType);
         wt.appendChild(tmp);
@@ -649,8 +708,10 @@ public class XMLGen {
         transaction.appendChild(e);
 
         // Territory
-        // ISO 3166-1 alpha-2
-        transaction.appendChild(mGenericElement(row, COL.Territory, true));
+        // XXX ISO 3166-1 alpha-2
+        e = dom.createElement("Territory");
+        e.appendChild(mGenericElement(row, COL.Territory, true));
+        transaction.appendChild(e);
 
         // Start or StartCondition
         // XXX XML allows empty value
@@ -698,14 +759,12 @@ public class XMLGen {
 
         // LicenseRightsDescription
         val = row[COL.LicenseRightsDescription.ordinal()];
-        if (!val.equals("")) {
-            if (!LRD.contains(val))
-                reportError("invalid LicenseRightsDescription " + val);
-            e = dom.createElement(COL.LicenseRightsDescription.toString());
-            tmp = dom.createTextNode(val);
-            e.appendChild(tmp);
-            transaction.appendChild(e);
-        }
+        if (!LRD.contains(val))
+            reportError("invalid LicenseRightsDescription " + val);
+        e = dom.createElement(COL.LicenseRightsDescription.toString());
+        tmp = dom.createTextNode(val);
+        e.appendChild(tmp);
+        transaction.appendChild(e);
 
         // FormatProfile
         val = row[COL.FormatProfile.ordinal()];
@@ -782,11 +841,17 @@ public class XMLGen {
         return transaction;
     }
 
-    /****************************************
+    /* **************************************
      * Upper-level methods
      ****************************************/
 
+    /**
+     * Generate an Avails XML document, based on data from a spreadsheet row
+     * @param row an array containing the values of a spreadsheet row
+     * @throws ParseException if there is an error and abort-on-error policy is in effect
+     */
     private void availGen(String[] row) throws Exception {
+        Node n;
         Element avail = dom.createElement("Avail");
         root.appendChild(avail);
         // ALID
@@ -795,21 +860,29 @@ public class XMLGen {
         avail.appendChild(mDisposition(row[COL.EntryType.ordinal()]));
         // Licensor
         avail.appendChild(mLicensor(row[COL.DisplayName.ordinal()]));
-        // Exception Flag
-        Node n = mException(row[COL.ExceptionFlag.ordinal()]);
-        if (n != null)
-            avail.appendChild(n);
+        // AvailType
+        avail.appendChild(mAvailType(row, avail));
+        // ShortDescription
+        avail.appendChild(mShortDescription());
         // Asset
         n = mAsset(row);
         if (n != null)
             avail.appendChild(n);
+        // Transaction
         n = mTransaction(row);
+        if (n != null)
+            avail.appendChild(n);
+        // Exception Flag
+        n = mExceptionFlag(row[COL.ExceptionFlag.ordinal()]);
         if (n != null)
             avail.appendChild(n);
 
     }
 
-    public Document makeXML(ArrayList<Object> rows) throws Exception {
+    public Document makeXML(ArrayList<Object> rows, String shortDesc) throws Exception {
+        if (shortDesc != null)
+            this.shortDesc = shortDesc;
+
     	//get an instance of factory
         DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
         dbf.setValidating(true);
@@ -859,9 +932,9 @@ public class XMLGen {
 
     }
 
-    public void makeXMLFile(ArrayList<Object> rows, String xmlFile) throws Exception {
+    public void makeXMLFile(ArrayList<Object> rows, String xmlFile, String shortDesc) throws Exception {
         try {
-            dom = makeXML(rows);
+            dom = makeXML(rows, shortDesc);
             
             // Use a Transformer for output
             TransformerFactory tFactory = TransformerFactory.newInstance();
@@ -886,5 +959,3 @@ public class XMLGen {
         }
     }
 } /* Class XMLGen */
-
-

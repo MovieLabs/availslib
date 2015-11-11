@@ -14,7 +14,7 @@ public class SS {
     public enum COL {
         DisplayName ("DisplayName"),
         StoreLanguage ("StoreLanguage"),
-        Territory ("Territory"),
+        Territory ("md:country"),
         WorkType ("WorkType"),
         EntryType ("EntryType"),
         TitleInternalAlias ("TitleInternalAlias"),
@@ -31,21 +31,21 @@ public class SS {
         Description ("Description"),
         OtherTerms ("OtherTerms"),
         OtherInstructions ("OtherInstructions"),
-        ContentID ("ContentID"),
+        ContentID ("contentID"),
         ProductID ("EditEIDR-S"),
         EncodeID ("EncodeID"),
         AvailID ("AvailID"),
         Metadata ("Metadata"),
-        AltID ("Identifier"),
+        AltID ("md:Identifier"),
         SuppressionLiftDate ("AnnounceDate"),
         SpecialPreOrderFulfillDate ("SpecialPreOrderFulfillDate"),
         ReleaseYear ("ReleaseDate"),
-        ReleaseHistoryOriginal ("Date"),
-        ReleaseHistoryPhysicalHV ("Date"),
+        ReleaseHistoryOriginal ("md:Date"),
+        ReleaseHistoryPhysicalHV ("md:Date"),
         ExceptionFlag ("ExceptionFlag"),
-        RatingSystem ("RatingSystem"),
-        RatingValue ("RatingValue"),
-        RatingReason ("RatingReason"),
+        RatingSystem ("md:System"),
+        RatingValue ("md:RatingValue"),
+        RatingReason ("md:RatingReason"),
         RentalDuration ("RentalDuration"),
         WatchDuration ("WatchDuration"),
         CaptionIncluded ("USACaptionsExemptionReason"),
@@ -85,10 +85,10 @@ public class SS {
         return ret;
     }
 
-    public void toXML(boolean clean, boolean wx, String outFile) throws Exception
+    public void toXML(boolean clean, boolean wx, String outFile, String shortDesc) throws Exception
     {
         XMLGen xml = new XMLGen(log, clean, wx);
-        xml.makeXMLFile(rows, outFile);
+        xml.makeXMLFile(rows, outFile, shortDesc);
     }
 
     public SS(String file, String sheetName, Logger log) throws Exception {

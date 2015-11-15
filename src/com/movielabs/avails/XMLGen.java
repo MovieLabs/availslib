@@ -606,7 +606,7 @@ public class XMLGen {
     } /* mMovieAsset() */
 
     // XXX not implemented
-    private Element  mEpisodeAsset(String[] row, Element asset) throws Exception {
+    private Element mEpisodeAsset(String[] row, Element asset) throws Exception {
         return null;
     }
 
@@ -859,7 +859,7 @@ public class XMLGen {
             transaction.appendChild(e);
 
         return transaction;
-    }
+    } /* mTransaction() */
 
     /* **************************************
      * Upper-level methods

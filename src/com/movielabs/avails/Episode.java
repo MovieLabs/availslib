@@ -203,9 +203,9 @@ public class Episode extends SheetRow {
         // Disposition
         avail.appendChild(mDisposition(fields[COL.EntryType.ordinal()]));
         // Licensor
-        avail.appendChild(mLicensor(fields[COL.DisplayName.ordinal()]));
+        avail.appendChild(mPublisher("md:Licensor", fields[COL.DisplayName.ordinal()], true));
         // Service Provider
-        if ((e = mServiceProvider(fields[COL.ServiceProvider.ordinal()])) != null)
+        if ((e = mPublisher("md:ServiceProvider", fields[COL.ServiceProvider.ordinal()], false)) != null)
             avail.appendChild(e);
         // AvailType ('episode' for an Episode)
         avail.appendChild(mGenericElement("AvailType", "single", true));

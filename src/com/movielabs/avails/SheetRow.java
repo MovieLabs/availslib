@@ -162,10 +162,14 @@ public abstract class SheetRow {
      * @return the created Licensor element
      * @throws ParseException if there is an error and abort-on-error policy is in effect
      */
-     protected Element mLicensor(String displayName) throws Exception {
-        if (displayName.equals(""))
-            reportError("missing md:DisplayName");
-        Element licensor = dom.createElement("Licensor");
+    protected Element mPublisher(String name, String displayName, boolean mandatory) throws Exception {
+        if (displayName.equals("")) {
+            if (mandatory)
+                reportError("missing md:DisplayName");
+            else
+                return null;
+        }
+        Element licensor = dom.createElement(name);
         Element e = dom.createElement("md:DisplayName");
         Text tmp = dom.createTextNode(displayName);
         e.appendChild(tmp);
@@ -179,14 +183,6 @@ public abstract class SheetRow {
         licensor.appendChild(e);
 
         return licensor;
-    }
-
-    protected Element mServiceProvider(String provider) throws Exception {
-        if (provider.equals(""))
-            return null;
-        Element e = dom.createElement("ServiceProvider");
-        e.appendChild(mGenericElement("DisplayName", provider, false));
-        return e;
     }
 
     protected abstract Element mAssetBody(Element asset) throws Exception;

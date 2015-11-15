@@ -331,9 +331,9 @@ public class Movie extends SheetRow {
         // Disposition
         avail.appendChild(mDisposition(fields[COL.EntryType.ordinal()]));
         // Licensor
-        avail.appendChild(mLicensor(fields[COL.DisplayName.ordinal()]));
+        avail.appendChild(mPublisher("Licensor", fields[COL.DisplayName.ordinal()], true));
         // Service Provider
-        if ((e = mServiceProvider(fields[COL.ServiceProvider.ordinal()])) != null)
+        if ((e = mPublisher("ServiceProvider", fields[COL.ServiceProvider.ordinal()], false)) != null)
             avail.appendChild(e);
         // AvailType ('single' for a Movie)
         avail.appendChild(mGenericElement("AvailType", "single", true));

@@ -73,6 +73,10 @@ public abstract class SheetRow {
         return shortDesc;
     }
 
+    public String[] getFields() {
+        return fields;
+    }
+
     /**
      * Create an XML element
      * @param name the name of the element

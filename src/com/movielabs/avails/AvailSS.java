@@ -64,4 +64,34 @@ public class AvailSS {
     public boolean getCleanupData() {
         return cleanupData;
     }
+
+    public void dump(String sheetName) {
+        for (AvailsSheet s : sheets) {
+            if (s.getName().equals(sheetName)) {
+                int i = 0;
+                for (SheetRow sr : s.getRows()) {
+                    System.out.print("row " + i++ + "=[");
+                    for (String cell : sr.getFields()) {
+                        System.out.print("|" + cell );
+                    }
+                    System.out.println("]");
+                }
+            }
+        }
+    }
+
+    public static void dumpFile(String file) throws Exception {
+        Workbook wb = new XSSFWorkbook(new FileInputStream(file));
+        for (int i = 0; i < wb.getNumberOfSheets(); i++) {
+            Sheet sheet = wb.getSheetAt(i);
+            System.out.println("Sheet <" + wb.getSheetName(i) + ">");
+            for (Row row : sheet) {
+                System.out.println("rownum: " + row.getRowNum());
+                for (Cell cell : row) {
+                    System.out.println("   | " + cell.toString());
+                }
+            }
+        }
+        wb.close();
+    }
 }

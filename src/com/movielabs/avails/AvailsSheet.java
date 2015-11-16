@@ -66,6 +66,10 @@ public class AvailsSheet {
         return name;
     }
 
+    public ArrayList<SheetRow> getRows() {
+        return rows;
+    }
+
     private void log(String s, boolean bail) throws Exception {
         s = String.format("Sheet %s: %s", name, s);
         parent.getLogger().warn(s);

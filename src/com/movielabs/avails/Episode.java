@@ -228,6 +228,7 @@ public class Episode extends SheetRow {
         // ------------------------------- Episode/Season
         Element seasonMetadata = dom.createElement("SeasonMetadata");
 
+        // SeasonContentID
         if ((e = mGenericElement(COL.SeasonContentID.toString(),
                                  fields[COL.SeasonContentID.ordinal()], false)) != null)
             seasonMetadata.appendChild(e);
@@ -333,6 +334,7 @@ public class Episode extends SheetRow {
         transaction.appendChild(mPriceType(fields[COL.PriceType.ordinal()],
                                            fields[COL.PriceValue.ordinal()]));
 
+        // SRP Term
         // XXX currency not specified
         String val = fields[COL.SRP.ordinal()];
         if (!val.equals(""))
@@ -341,9 +343,8 @@ public class Episode extends SheetRow {
         // SuppressionLiftDate term
         // XXX validate; required for pre-orders
         val = fields[COL.SuppressionLiftDate.ordinal()];
-        if (!val.equals("")) {
+        if (!val.equals(""))
             transaction.appendChild(makeEventTerm(COL.SuppressionLiftDate.toString(), normalizeDate(val)));
-        }
 
         // Any Term
         val = fields[COL.Any.ordinal()];

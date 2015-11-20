@@ -103,6 +103,76 @@ public abstract class SheetRow {
      * Node-generating methods
      ****************************************/
 
+    protected Element mReleaseHistory(String name, String val, String rType) throws Exception {
+        Element rh = null;
+        if (!val.equals("")) { // optional
+            String date = normalizeDate(val);
+            if (date == null)
+                reportError("Invalid " + name + ": " + val);
+            rh = dom.createElement("ReleaseHistory");
+            Element rt = dom.createElement("md:ReleaseType");
+            Text tmp = dom.createTextNode(rType);
+            rt.appendChild(tmp);
+            rh.appendChild(rt);
+            rh.appendChild(mGenericElement(name, val, false));
+        }
+        return rh;
+    }
+
+    protected void mCaption(Element m, String capIncluded, String capExemption,
+                               String territory) throws Exception {
+        Element e;
+        if ((e = mCaptionsExemptionReason(capIncluded, capExemption, territory)) != null) {
+            if (!territory.equals("US")) {
+                Comment comment = dom.createComment("Exemption reason specified for non-US territory");
+                m.appendChild(comment);
+            }
+            m.appendChild(e);
+        }
+    }
+
+    protected void mRatings(Element m, String ratingSystem, String ratingValue, String ratingReason,
+                            String territory)
+        throws Exception {
+       // RatingSystem ---> Ratings
+        if (ratingSystem.equals("")) { // optional
+            if (!(ratingValue.equals("") && ratingReason.equals("")))
+                reportError("RatingSystem not specified");
+        } else {
+            Element ratings = dom.createElement("Ratings");
+            Element rat = dom.createElement("md:Rating");
+            ratings.appendChild(rat);
+            Comment comment = dom.createComment("Ratings Region derived from Spreadsheet Territory value");
+            rat.appendChild(comment);
+            Element region = dom.createElement("md:Region");
+            // XXX validate country
+            Element country = dom.createElement("md:country");
+            region.appendChild(country);
+            Text tmp = dom.createTextNode(territory);
+            country.appendChild(tmp);
+            rat.appendChild(region);
+            rat.appendChild(mGenericElement("md:System", ratingSystem, true));
+            rat.appendChild(mGenericElement("md:Value", ratingValue, true));
+            Element reason = mGenericElement("md:RatingReason", ratingReason, false);
+            if (reason != null)
+                rat.appendChild(reason);
+            m.appendChild(ratings);
+        }
+    }
+
+    protected Element mCount(String name, String val) throws Exception {
+        if (val.equals(""))
+            reportError("missing required value on element: " + name);
+        Element tia = dom.createElement(name);
+        Element e = dom.createElement("md:Number");
+        int n = normalizeInt(val);
+        Text tmp = dom.createTextNode(String.valueOf(n));
+        e.appendChild(tmp);
+        tia.appendChild(e);
+
+        return tia;
+    } 
+
     /**
      * Creates an Avails/ALID XML node
      * @param availID the value of the ALID
@@ -397,9 +467,11 @@ public abstract class SheetRow {
         e.setAttributeNode(attr);
  
         Element e2 = dom.createElement("Money");
-        attr = dom.createAttribute("currency");
-        attr.setValue(currency);
-        e2.setAttributeNode(attr);
+        if (currency != null) {
+            attr = dom.createAttribute("currency");
+            attr.setValue(currency);
+            e2.setAttributeNode(attr);
+        }
         Text tmp = dom.createTextNode(value);
         e2.appendChild(tmp);
         e.appendChild(e2);
@@ -414,7 +486,7 @@ public abstract class SheetRow {
         if (val.equals("")) { // XXX ugly hack
             tmp = dom.createTextNode("PT0H");
         } else {
-            Pattern dur = Pattern.compile("^\\s*(\\d{1,2}):(\\d{1,2}):(\\d{1,2})\\s*$");
+            Pattern dur = Pattern.compile("^\\s*(\\d{1,2}):(\\d{1,2})(?::(\\d{1,2}))?\\s*$");
             Matcher m = dur.matcher(val);
             if (m.matches()) {
                 int hour, min, sec;
@@ -598,6 +670,8 @@ public abstract class SheetRow {
     }
 
     protected int normalizeInt(String s) throws Exception {
+    	if (s == null)
+            return 0;
         Pattern eidr = Pattern.compile("^\\s*(\\d+)(?:\\.0)?\\s*$");
         Matcher m = eidr.matcher(s);
         if (m.matches()) {

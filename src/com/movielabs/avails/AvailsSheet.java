@@ -83,7 +83,7 @@ public class AvailsSheet {
 
         if (!(workType.equals("Movie") || workType.equals("Episode"))) {
             if (parent.getCleanupData()) {
-                Pattern pat = Pattern.compile("^\\s*(movie|episode)\\s*$", Pattern.CASE_INSENSITIVE);
+                Pattern pat = Pattern.compile("^\\s*(movie|episode|season)\\s*$", Pattern.CASE_INSENSITIVE);
                 Matcher m = pat.matcher(workType);
                 if (m.matches()) {
                     log("corrected from '" + workType + "'", false);
@@ -105,6 +105,9 @@ public class AvailsSheet {
         case "Episode":
             sr = new Episode(this, "Episode", rows.size() + 1, fields);
             break;
+        case "Season":
+        	sr = new Season(this, "Season", rows.size() + 1, fields);
+        	break;
         default:
             log("invalid workType: " + workType, true);
             return;

@@ -101,6 +101,7 @@ public class Movie extends SheetRow {
         // TitleInternalAlias
         metadata.appendChild(mGenericElement(COL.TitleInternalAlias.toString(),
                                              fields[COL.TitleInternalAlias.ordinal()], true));
+
         // ProductID --> EditEIDR-S
         if (!fields[COL.ProductID.ordinal()].equals("")) { // optional field
             String productID = normalizeEIDR(fields[COL.ProductID.ordinal()]);
@@ -112,6 +113,7 @@ public class Movie extends SheetRow {
             metadata.appendChild(mGenericElement(COL.ProductID.toString(),
                                                  fields[COL.ProductID.ordinal()], false));
         }
+
         // AltID --> AltIdentifier
         if (!fields[COL.AltID.ordinal()].equals("")) { // optional
             Element altID = dom.createElement("AltIdentifier");
@@ -127,6 +129,7 @@ public class Movie extends SheetRow {
             altID.appendChild(loc);
             metadata.appendChild(altID);
         }
+
         // ReleaseYear ---> ReleaseDate
         if (!fields[COL.ReleaseYear.ordinal()].equals("")) { // optional
             String year = normalizeYear(fields[COL.ReleaseYear.ordinal()]);
@@ -138,82 +141,38 @@ public class Movie extends SheetRow {
             metadata.appendChild(mGenericElement(COL.ReleaseYear.toString(), 
                                                  fields[COL.ReleaseYear.ordinal()], false));
         }
+
         // TotalRunTime --> RunLength
         // XXX TotalRunTime is optional, RunLength is required
         if ((e = mRunLength(fields[COL.TotalRunTime.ordinal()])) != null) {
             metadata.appendChild(e);
         }
+
         // ReleaseHistoryOriginal ---> ReleaseHistory/Date
-        if (!fields[COL.ReleaseHistoryOriginal.ordinal()].equals("")) { // optional
-            String date = normalizeDate(fields[COL.ReleaseHistoryOriginal.ordinal()]);
-            if (date == null) {
-                reportError("Invalid ReleaseHistoryOriginal: " + fields[COL.ReleaseHistoryOriginal.ordinal()]);
-            } else {
-                fields[COL.ReleaseHistoryOriginal.ordinal()] = date;
-            }
-            Element rh = dom.createElement("ReleaseHistory");
-            Element rt = dom.createElement("md:ReleaseType");
-            Text tmp = dom.createTextNode("original");
-            rt.appendChild(tmp);
-            rh.appendChild(rt);
-            rh.appendChild(mGenericElement(COL.ReleaseHistoryOriginal.toString(),
-                                           fields[COL.ReleaseHistoryOriginal.ordinal()], false));
-            metadata.appendChild(rh);
+        String date = fields[COL.ReleaseHistoryOriginal.ordinal()];
+        if (!date.equals("")) {
+            if ((e = mReleaseHistory(COL.ReleaseHistoryOriginal.toString(),
+                                     normalizeDate(date), "original")) != null)
+                metadata.appendChild(e);
         }
+         
         // ReleaseHistoryPhysicalHV ---> ReleaseHistory/Date
-        if (!fields[COL.ReleaseHistoryPhysicalHV.ordinal()].equals("")) { // optional
-            String date = normalizeDate(fields[COL.ReleaseHistoryPhysicalHV.ordinal()]);
-            if (date == null) {
-                reportError("Invalid ReleaseHistoryPhysicalHV: " + fields[COL.ReleaseHistoryPhysicalHV.ordinal()]);
-            } else {
-                fields[COL.ReleaseHistoryPhysicalHV.ordinal()] = date;
-            }
-            Element rh = dom.createElement("ReleaseHistory");
-            Element rt = dom.createElement("md:ReleaseType");
-            Text tmp = dom.createTextNode("DVD");
-            rt.appendChild(tmp);
-            rh.appendChild(rt);
-            rh.appendChild(mGenericElement(COL.ReleaseHistoryPhysicalHV.toString(),
-                                           fields[COL.ReleaseHistoryPhysicalHV.ordinal()], false));
-            metadata.appendChild(rh);
+        date = fields[COL.ReleaseHistoryPhysicalHV.ordinal()];
+        if (!date.equals("")) {
+            if ((e = mReleaseHistory(COL.ReleaseHistoryPhysicalHV.toString(),
+                                     normalizeDate(date), "DVD")) != null)
+                metadata.appendChild(e);
         }
+
         // CaptionIncluded/CaptionException
-        if ((e = mCaptionsExemptionReason(fields[COL.CaptionIncluded.ordinal()],
-                                          fields[COL.CaptionExemption.ordinal()],
-                                          territory)) != null) {
-            if (!territory.equals("US")) {
-                Comment comment = dom.createComment("Exemption reason specified for non-US territory");
-                metadata.appendChild(comment);
-            }
-            metadata.appendChild(e);
-        }
+        mCaption(metadata, fields[COL.CaptionIncluded.ordinal()],
+                 fields[COL.CaptionExemption.ordinal()], territory);
+
         // RatingSystem ---> Ratings
-        if (fields[COL.RatingSystem.ordinal()].equals("")) { // optional
-            if (!(fields[COL.RatingValue.ordinal()].equals("") && fields[COL.RatingReason.ordinal()].equals("")))
-                reportError("RatingSystem not specified");
-        } else {
-            Element ratings = dom.createElement("Ratings");
-            Element rat = dom.createElement("md:Rating");
-            ratings.appendChild(rat);
-            Comment comment = dom.createComment("Ratings Region derived from Spreadsheet Territory value");
-            rat.appendChild(comment);
-            Element region = dom.createElement("md:Region");
-            // XXX validate country
-            Element country = dom.createElement("md:country");
-            region.appendChild(country);
-            Text tmp = dom.createTextNode(territory);
-            country.appendChild(tmp);
-            rat.appendChild(region);
-            rat.appendChild(mGenericElement(COL.RatingSystem.toString(), 
-                                            fields[COL.RatingSystem.ordinal()], true));
-            rat.appendChild(mGenericElement(COL.RatingValue.toString(),
-                                            fields[COL.RatingValue.ordinal()], true));
-            Element reason = mGenericElement(COL.RatingReason.toString(),
-                                             fields[COL.RatingReason.ordinal()], false);
-            if (reason != null)
-                rat.appendChild(reason);
-            metadata.appendChild(ratings);
-        }
+        mRatings(metadata, fields[COL.RatingSystem.ordinal()], 
+                 fields[COL.RatingValue.ordinal()], fields[COL.RatingReason.ordinal()], 
+                 territory);
+
         // EncodeID --> EditEIDR-S
         if (!fields[COL.EncodeID.ordinal()].equals("")) { // optional field
             String encodeID = normalizeEIDR(fields[COL.EncodeID.ordinal()]);
@@ -225,10 +184,12 @@ public class Movie extends SheetRow {
             metadata.appendChild(mGenericElement(COL.EncodeID.toString(),
                                                  fields[COL.EncodeID.ordinal()], false));
         }
+
         // LocalizationType --> LocalizationOffering
         if ((e = mLocalizationType(metadata, fields[COL.LocalizationType.ordinal()])) != null) {
             metadata.appendChild(e);
         }
+
         // Attach generated Metadata node
         asset.appendChild(metadata);
         return asset;
@@ -273,9 +234,14 @@ public class Movie extends SheetRow {
         transaction.appendChild(mPriceType(fields[COL.PriceType.ordinal()],
                                            fields[COL.PriceValue.ordinal()]));
 
+        // XXX currency not specified
+        String val = fields[COL.SRP.ordinal()];
+        if (!val.equals(""))
+            transaction.appendChild(makeMoneyTerm("SRP", fields[COL.SRP.ordinal()], null));
+
         // SuppressionLiftDate term
         // XXX validate; required for pre-orders
-        String val = fields[COL.SuppressionLiftDate.ordinal()];
+        val = fields[COL.SuppressionLiftDate.ordinal()];
         if (!val.equals("")) {
             transaction.appendChild(makeEventTerm(COL.SuppressionLiftDate.toString(), normalizeDate(val)));
         }
@@ -328,25 +294,33 @@ public class Movie extends SheetRow {
 
         // ALID
         avail.appendChild(mALID(fields[COL.AvailID.ordinal()]));
+
         // Disposition
         avail.appendChild(mDisposition(fields[COL.EntryType.ordinal()]));
+
         // Licensor
         avail.appendChild(mPublisher("Licensor", fields[COL.DisplayName.ordinal()], true));
+
         // Service Provider
         if ((e = mPublisher("ServiceProvider", fields[COL.ServiceProvider.ordinal()], false)) != null)
             avail.appendChild(e);
+
         // AvailType ('single' for a Movie)
         avail.appendChild(mGenericElement("AvailType", "single", true));
+
         // ShortDescription
         // XXX Doc says optional, schema says mandatory
         if ((e = mGenericElement("ShortDescription", shortDesc, true)) != null)
             avail.appendChild(e);
+
         // Asset
         if ((e = mAssetHeader()) != null)
             avail.appendChild(e);
+
         // Transaction
         if ((e = mTransactionHeader()) != null)
             avail.appendChild(e);
+
         // Exception Flag
         if ((e = mExceptionFlag(fields[COL.ExceptionFlag.ordinal()])) != null)
             avail.appendChild(e);

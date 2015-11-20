@@ -29,15 +29,15 @@ public class Episode extends SheetRow {
         SeasonNumber("SeasonNumber"),                                  //  7
         EpisodeNumber("EpisodeNumber"),                                //  8
         LocalizationType ("LocalizationOffering"),                     //  9
-        EpisodeTitleInternalAlias ("EpisodeTitleInternalAlias"),       // 10
-        EpisodeTitleDisplayUnlimited ("EpisodeTitleDisplayUnlimited"), // 11
+        EpisodeTitleInternalAlias ("TitleInternalAlias"),              // 10
+        EpisodeTitleDisplayUnlimited ("TitleDisplayUnlimited"),        // 11
         SeasonTitleInternalAlias ("SeasonTitleInternalAlias"),         // 12
         SeasonTitleDisplayUnlimited ("SeasonTitleDisplayUnlimited"),   // 13
-        EpisodeCount("EpisodeCount"),                                  // 14
-        SeasonCount("SeasonCount"),                                    // 15
-        SeriesAltID ("md:Identifier"),                                 // 16
-        SeasonAltID ("md:Identifier"),                                 // 17
-        EpisodeAltID ("md:Identifier"),                                // 18
+        EpisodeCount("NumberOfEpisodes"),                              // 14
+        SeasonCount("NumberOfSeasons"),                                // 15
+        SeriesAltID ("SeriesAltIdentifier"),                           // 16
+        SeasonAltID ("SeasonAltIdentifier"),                           // 17
+        EpisodeAltID ("AltIdentifier"),                                // 18
         CompanyDisplayCredit("CompanyDisplayCredit"),                  // 19
         LicenseType ("LicenseType"),                                   // 20
         LicenseRightsDescription ("LicenseRightsDescription"),         // 21
@@ -51,8 +51,8 @@ public class Episode extends SheetRow {
         Description ("Description"),                                   // 29
         OtherTerms ("OtherTerms"),                                     // 30
         OtherInstructions ("OtherInstructions"),                       // 31
-        SeriesContentID ("contentID"),                                 // 32
-        SeasonContentID ("contentID"),                                 // 33
+        SeriesContentID ("SeriesContentID"),                           // 32
+        SeasonContentID ("SeasonContentID"),                           // 33
         EpisodeContentID ("contentID"),                                // 34
         EpisodeProductID ("EditEIDR-S"),                               // 35
         EncodeID ("EncodeID"),                                         // 36
@@ -94,9 +94,205 @@ public class Episode extends SheetRow {
         }
     } /* COL */
     
-    protected Element mAssetBody(Element asset) throws Exception {
-        return asset;
+    private void TDUHelper(Element metadata, COL col, COL rcol, String sub) throws Exception {
+        Element e;
+        if (sub != null) {
+            if (fields[col.ordinal()].equals("") && fields[rcol.ordinal()].equals(""))
+                fields[col.ordinal()] = sub;
+        }
+        if (fields[col.ordinal()].equals(""))
+            fields[col.ordinal()] = fields[rcol.ordinal()];
+        if ((e = mGenericElement(col.toString(), 
+                                 fields[col.ordinal()], false)) != null)
+            metadata.appendChild(e);
     }
+
+    private void altIDHelper(Element metadata, COL col) throws Exception {
+        if (!fields[col.ordinal()].equals("")) { // optional
+            Element altID = dom.createElement(col.toString());
+            Element cid = dom.createElement("md:Namespace");
+            Text tmp = dom.createTextNode(MISSING);
+            cid.appendChild(tmp);
+            altID.appendChild(cid);
+            altID.appendChild(mGenericElement("md:Identifier", 
+                                              fields[col.ordinal()], false));
+            Element loc = dom.createElement("md:Location");
+            tmp = dom.createTextNode(MISSING);
+            loc.appendChild(tmp);
+            altID.appendChild(loc);
+            metadata.appendChild(altID);
+        }
+    }
+
+    protected Element mAssetBody(Element asset) throws Exception {
+        Element e;
+        Attr attr;
+        Text tmp;
+        String territory = fields[COL.Territory.ordinal()];
+        
+        // ------------------------------- Episode
+
+        // EpisodeContentID --> Asset@ContentID
+        Element episodeMetadata = dom.createElement("EpisodeMetadata");
+        attr = dom.createAttribute(COL.EpisodeContentID.toString());
+        attr.setValue(fields[COL.EpisodeContentID.ordinal()]);
+        asset.setAttributeNode(attr);
+
+        // EpisodeTitleDisplayUnlimited
+        // XXX Optional in SS, Required in XML; workaround by assigning it internal alias value
+        TDUHelper(episodeMetadata, COL.EpisodeTitleDisplayUnlimited, COL.EpisodeTitleInternalAlias,
+                  null);
+
+        // TitleInternalAlias
+        episodeMetadata.appendChild(mGenericElement(COL.EpisodeTitleInternalAlias.toString(),
+                                             fields[COL.EpisodeTitleInternalAlias.ordinal()], true));
+
+        // ProductID --> EditEIDR-S
+        if (!fields[COL.EpisodeProductID.ordinal()].equals("")) { // optional field
+            String productID = normalizeEIDR(fields[COL.EpisodeProductID.ordinal()]);
+            if (productID == null) {
+                reportError("Invalid ProductID: " + fields[COL.EpisodeProductID.ordinal()]);
+            } else {
+                fields[COL.EpisodeProductID.ordinal()] = productID;
+            }
+            episodeMetadata.appendChild(mGenericElement(COL.EpisodeProductID.toString(),
+                                                 fields[COL.EpisodeProductID.ordinal()], false));
+        }
+
+        // EpisodeAltID --> AltIdentifier
+        altIDHelper(episodeMetadata, COL.EpisodeAltID);
+
+        // ReleaseYear ---> ReleaseDate
+        if (!fields[COL.ReleaseYear.ordinal()].equals("")) { // optional
+            String year = normalizeYear(fields[COL.ReleaseYear.ordinal()]);
+            if (year == null) {
+                reportError("Invalid ReleaseYear: " + fields[COL.ReleaseYear.ordinal()]);
+            } else {
+                fields[COL.ReleaseYear.ordinal()] = year;
+            }
+            episodeMetadata.appendChild(mGenericElement(COL.ReleaseYear.toString(), 
+                                                 fields[COL.ReleaseYear.ordinal()], false));
+        }
+
+        // TotalRunTime --> RunLength
+        // XXX TotalRunTime is optional, RunLength is required
+        if ((e = mRunLength(fields[COL.TotalRunTime.ordinal()])) != null)
+            episodeMetadata.appendChild(e);
+
+        // ReleaseHistoryOriginal ---> ReleaseHistory/Date
+        String date = fields[COL.ReleaseHistoryOriginal.ordinal()];
+        if (!date.equals("")) {
+            if ((e = mReleaseHistory(COL.ReleaseHistoryOriginal.toString(),
+                                     normalizeDate(date), "Broadcast")) != null)
+                episodeMetadata.appendChild(e);
+        }
+         
+        // ReleaseHistoryPhysicalHV ---> ReleaseHistory/Date
+        date = fields[COL.ReleaseHistoryPhysicalHV.ordinal()];
+        if (!date.equals("")) {
+            if ((e = mReleaseHistory(COL.ReleaseHistoryPhysicalHV.toString(),
+                                     normalizeDate(date), "DVD")) != null)
+                episodeMetadata.appendChild(e);
+        }
+
+        // CaptionIncluded/CaptionException
+        mCaption(episodeMetadata, fields[COL.CaptionIncluded.ordinal()],
+                 fields[COL.CaptionExemption.ordinal()], territory);
+
+        // RatingSystem ---> Ratings
+        mRatings(episodeMetadata, fields[COL.RatingSystem.ordinal()], 
+                 fields[COL.RatingValue.ordinal()], fields[COL.RatingReason.ordinal()], 
+                 territory);
+
+        // EncodeID --> EditEIDR-S
+        if (!fields[COL.EncodeID.ordinal()].equals("")) { // optional field
+            String encodeID = normalizeEIDR(fields[COL.EncodeID.ordinal()]);
+            if (encodeID == null) {
+                reportError("Invalid EncodeID: " + fields[COL.EncodeID.ordinal()]);
+            } else {
+                fields[COL.EncodeID.ordinal()] = encodeID;
+            }
+            episodeMetadata.appendChild(mGenericElement(COL.EncodeID.toString(),
+                                                 fields[COL.EncodeID.ordinal()], false));
+        }
+
+        // LocalizationType --> LocalizationOffering
+        if ((e = mLocalizationType(episodeMetadata, fields[COL.LocalizationType.ordinal()])) != null) {
+            episodeMetadata.appendChild(e);
+        }
+
+        // EpisodeNumber
+        episodeMetadata.appendChild(mCount(COL.EpisodeNumber.toString(),
+                                           fields[COL.EpisodeNumber.ordinal()]));
+                                                           
+        // ------------------------------- Episode/Season
+        Element seasonMetadata = dom.createElement("SeasonMetadata");
+
+        if ((e = mGenericElement(COL.SeasonContentID.toString(),
+                                 fields[COL.SeasonContentID.ordinal()], false)) != null)
+            seasonMetadata.appendChild(e);
+
+        // SeasonDisplayUnlimited
+        // XXX Optional in SS, Required in XML; workaround by assigning it internal alias value
+        TDUHelper(seasonMetadata, COL.SeasonTitleDisplayUnlimited, COL.SeasonTitleInternalAlias,
+                  MISSING);
+
+        // SeasonTitleInternalAlias
+        seasonMetadata.appendChild(mGenericElement(COL.SeasonTitleInternalAlias.toString(),
+                                             fields[COL.SeasonTitleInternalAlias.ordinal()], true));
+
+        // SeasonNumber
+        seasonMetadata.appendChild(mCount(COL.SeasonNumber.toString(),
+                                           fields[COL.SeasonNumber.ordinal()]));
+
+        // SeasonAltIdentifier
+        altIDHelper(seasonMetadata, COL.SeasonAltID);
+
+        // EpisodeCount --> NumberOfEpisodes
+        String nEp = fields[COL.EpisodeCount.ordinal()];
+        if (!nEp.equals("")) {
+            int n = normalizeInt(nEp);
+            e = dom.createElement(COL.EpisodeCount.toString());
+            tmp = dom.createTextNode(String.valueOf(n));
+            e.appendChild(tmp);
+            seasonMetadata.appendChild(e);
+        }
+
+        episodeMetadata.appendChild(seasonMetadata);
+
+        // ------------------------------- Episode/Season/Series
+        Element seriesMetadata = dom.createElement("SeriesMetadata");
+        e = dom.createElement(COL.SeriesContentID.toString());
+        tmp = dom.createTextNode(fields[COL.SeriesContentID.ordinal()]);
+        e.appendChild(tmp);
+        seriesMetadata.appendChild(e);
+
+        // SeriesDisplayUnlimited
+        // XXX Optional in SS, Required in XML; workaround by assigning it internal alias value
+        TDUHelper(seriesMetadata, COL.SeriesTitleDisplayUnlimited, COL.SeriesTitleInternalAlias,
+                  MISSING);
+
+        // SeriesInternalAlias
+        seriesMetadata.appendChild(mGenericElement(COL.SeriesTitleInternalAlias.toString(),
+                                             fields[COL.SeriesTitleInternalAlias.ordinal()], true));
+
+        altIDHelper(seriesMetadata, COL.SeriesAltID);
+
+        // SeasonCount --> NumberOfSeasons
+        String nSe = fields[COL.SeasonCount.ordinal()];
+        if (!nSe.equals("")) {
+            int n = normalizeInt(nSe);
+            e = dom.createElement(COL.SeasonCount.toString());
+            tmp = dom.createTextNode(String.valueOf(n));
+            e.appendChild(tmp);
+            seriesMetadata.appendChild(e);
+        }
+
+        seasonMetadata.appendChild(seriesMetadata);
+
+        asset.appendChild(episodeMetadata);
+        return asset;
+    } /* mAssetBody() */
 
     protected Element mTransactionBody(Element transaction) throws Exception {
         Element e;
@@ -137,9 +333,14 @@ public class Episode extends SheetRow {
         transaction.appendChild(mPriceType(fields[COL.PriceType.ordinal()],
                                            fields[COL.PriceValue.ordinal()]));
 
+        // XXX currency not specified
+        String val = fields[COL.SRP.ordinal()];
+        if (!val.equals(""))
+            transaction.appendChild(makeMoneyTerm("SRP", fields[COL.SRP.ordinal()], null));
+
         // SuppressionLiftDate term
         // XXX validate; required for pre-orders
-        String val = fields[COL.SuppressionLiftDate.ordinal()];
+        val = fields[COL.SuppressionLiftDate.ordinal()];
         if (!val.equals("")) {
             transaction.appendChild(makeEventTerm(COL.SuppressionLiftDate.toString(), normalizeDate(val)));
         }
@@ -200,27 +401,32 @@ public class Episode extends SheetRow {
 
         // ALID
         avail.appendChild(mALID(fields[COL.AvailID.ordinal()]));
+
         // Disposition
         avail.appendChild(mDisposition(fields[COL.EntryType.ordinal()]));
+
         // Licensor
-        avail.appendChild(mPublisher("md:Licensor", fields[COL.DisplayName.ordinal()], true));
+        avail.appendChild(mPublisher("Licensor", fields[COL.DisplayName.ordinal()], true));
+
         // Service Provider
-        if ((e = mPublisher("md:ServiceProvider", fields[COL.ServiceProvider.ordinal()], false)) != null)
+        if ((e = mPublisher("ServiceProvider", fields[COL.ServiceProvider.ordinal()], false)) != null)
             avail.appendChild(e);
         // AvailType ('episode' for an Episode)
-        avail.appendChild(mGenericElement("AvailType", "single", true));
+        avail.appendChild(mGenericElement("AvailType", "episode", true));
+
         // ShortDescription
         // XXX Doc says optional, schema says mandatory
         if ((e = mGenericElement("ShortDescription", shortDesc, true)) != null)
             avail.appendChild(e);
-        // Asset
-        // n = mAsset(row);
-        // if (n != null)
-        //     avail.appendChild(n);
+
+         // Asset
+        if ((e = mAssetHeader()) != null)
+            avail.appendChild(e);
+
         // Transaction
-        // n = mTransaction(row);
-        // if (n != null)
-        //     avail.appendChild(n);
+        if ((e = mTransactionHeader()) != null)
+            avail.appendChild(e);
+
         // Exception Flag
         if ((e = mExceptionFlag(fields[COL.ExceptionFlag.ordinal()])) != null)
             avail.appendChild(e);

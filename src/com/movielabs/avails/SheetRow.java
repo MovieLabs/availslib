@@ -29,22 +29,25 @@ public abstract class SheetRow {
     protected boolean cleanupData;
     protected String workType;
     protected String shortDesc;
+    protected static final String[] ISO3166 = Locale.getISOCountries();
     
-    ArrayList<String> LRD = new ArrayList<String>(Arrays.asList("New Release",
-                                                                "Library",
-                                                                "Mega-Library",
-                                                                "Priority Library",
-                                                                "DD-Theatrical",
-                                                                "Pre-Theatrical",
-                                                                "DD-DVD",
-                                                                "Early EST",
-                                                                "Preorder EST",
-                                                                "Early VOD",
-                                                                "Preorder VOD",
-                                                                "DTV",
-                                                                "Next Day TV",
-                                                                "Season Only",
-                                                                "Free"));
+    protected static String[] LRD  =  { // Controlled vocabulary, must be sorted
+        "DD-DVD",
+        "DD-Theatrical",
+        "DTV",
+        "Early EST",
+        "Early VOD",
+        "Free",
+        "Library",
+        "Mega-Library",
+        "Next Day TV",
+        "New Release",
+        "Pre-Theatrical",
+        "Preorder EST",
+        "Preorder VOD",
+        "Priority Library",
+        "Season Only"
+    };
 
     public SheetRow(AvailsSheet parent, String workType, int lineNo, String[] fields) {
         this.parent = parent;
@@ -138,26 +141,27 @@ public abstract class SheetRow {
         if (ratingSystem.equals("")) { // optional
             if (!(ratingValue.equals("") && ratingReason.equals("")))
                 reportError("RatingSystem not specified");
-        } else {
-            Element ratings = dom.createElement("Ratings");
-            Element rat = dom.createElement("md:Rating");
-            ratings.appendChild(rat);
-            Comment comment = dom.createComment("Ratings Region derived from Spreadsheet Territory value");
-            rat.appendChild(comment);
-            Element region = dom.createElement("md:Region");
-            // XXX validate country
-            Element country = dom.createElement("md:country");
-            region.appendChild(country);
-            Text tmp = dom.createTextNode(territory);
-            country.appendChild(tmp);
-            rat.appendChild(region);
-            rat.appendChild(mGenericElement("md:System", ratingSystem, true));
-            rat.appendChild(mGenericElement("md:Value", ratingValue, true));
-            Element reason = mGenericElement("md:RatingReason", ratingReason, false);
-            if (reason != null)
-                rat.appendChild(reason);
-            m.appendChild(ratings);
         }
+        if (Arrays.binarySearch(ISO3166, territory) == -1) { // validate legit ISO 3166-1 alpha-2
+            reportError("invalid Country Code: " + territory);
+        }
+        Element ratings = dom.createElement("Ratings");
+        Element rat = dom.createElement("md:Rating");
+        ratings.appendChild(rat);
+        Comment comment = dom.createComment("Ratings Region derived from Spreadsheet Territory value");
+        rat.appendChild(comment);
+        Element region = dom.createElement("md:Region");
+        Element country = dom.createElement("md:country");
+        region.appendChild(country);
+        Text tmp = dom.createTextNode(territory);
+        country.appendChild(tmp);
+        rat.appendChild(region);
+        rat.appendChild(mGenericElement("md:System", ratingSystem, true));
+        rat.appendChild(mGenericElement("md:Value", ratingValue, true));
+        Element reason = mGenericElement("md:RatingReason", ratingReason, false);
+        if (reason != null)
+            rat.appendChild(reason);
+        m.appendChild(ratings);
     }
 
     protected Element mCount(String name, String val) throws Exception {
@@ -288,8 +292,9 @@ public abstract class SheetRow {
         return e;
     }
 
-    // XXX ISO 3166-1 alpha-2
     protected Element mTerritory(String val) throws Exception {
+        if (Arrays.binarySearch(ISO3166, val) == -1) // validate legit ISO 3166-1 alpha-2
+            reportError("invalid Country Code: " + val);
         Element e = dom.createElement("Territory");
         Element e2 = mGenericElement("md:country", val, true);
         e.appendChild(e2);
@@ -349,14 +354,19 @@ public abstract class SheetRow {
         return e;
     }
 
-    // XXX RFC 1766 validation needed
+    // XXX RFC 5646/BCP 77 validation needed
     protected Element mStoreLanguage(String val) throws Exception {
+        try {
+            Locale aLocale = new Locale.Builder().setLanguage(val).build();
+        } catch (IllformedLocaleException e) {
+            reportError("invalid Locale: " + val + " (" + e + ")");
+        }
         return mGenericElement("StoreLanguage", val, false);
     }
 
     // XXX cleanupData code not added
     protected Element mLicenseRightsDescription(String val) throws Exception {
-        if (!LRD.contains(val))
+        if (Arrays.binarySearch(LRD, val) == -1)
             reportError("invalid LicenseRightsDescription " + val);
         Element e = dom.createElement("LicenseRightsDescription");
         Text tmp = dom.createTextNode(val);

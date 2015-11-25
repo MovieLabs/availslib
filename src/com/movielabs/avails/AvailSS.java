@@ -11,6 +11,10 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
+/**
+ * Represents an Excel spreadsheet comprising multiple individual
+ * sheets, each of which are represented by an AvailsSheet object
+ */
 public class AvailSS {
     private String file;
     private ArrayList<AvailsSheet> sheets;
@@ -26,6 +30,13 @@ public class AvailSS {
         sheets = new ArrayList<AvailsSheet>();
     }
 
+    /**
+     * Add a sheet from an Excel spreadsheet
+     * @param sheetName name of the sheet to add
+     * @return created sheet object
+     * @throws IllegalArgumentException if the sheet does not exist in the Excel spreadsheet
+     * @throws Exception other error conditions may also throw exceptions
+     */
     public AvailsSheet addSheet(String sheetName) throws Exception {
         Workbook wb = new XSSFWorkbook(new FileInputStream(file));
         Sheet sheet = wb.getSheet(sheetName);
@@ -65,6 +76,10 @@ public class AvailSS {
         return cleanupData;
     }
 
+    /**
+     * Dump raw contents of specified sheet
+     * @param sheetName name of the sheet to dump
+     */
     public void dump(String sheetName) {
         for (AvailsSheet s : sheets) {
             if (s.getName().equals(sheetName)) {
@@ -80,6 +95,11 @@ public class AvailSS {
         }
     }
 
+    /**
+     * Dump the contents (sheet-by-sheet) of an Excel spreadsheet
+     * @param file name of the Excel .xlsx spreadsheet
+     * @throws Exception if any error is encountered (e.g. non-existant or corrupt file)
+     */
     public static void dumpFile(String file) throws Exception {
         Workbook wb = new XSSFWorkbook(new FileInputStream(file));
         for (int i = 0; i < wb.getNumberOfSheets(); i++) {

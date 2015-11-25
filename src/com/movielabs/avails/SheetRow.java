@@ -17,6 +17,9 @@ import java.util.regex.Pattern;
 import org.w3c.dom.*;
 import org.apache.logging.log4j.*;
 
+/**
+ * An abstract class that is parent to all types of Avails, and contains common routines
+ */
 public abstract class SheetRow {
     protected AvailsSheet parent;
     protected int lineNo;
@@ -236,9 +239,12 @@ public abstract class SheetRow {
     /**
      * Create an Avails Licensor XML element with a md:DisplayName element child, and populate thei latter 
      * with the DisplayName 
+     * @param name the Licensor element to be created
      * @param displayName the name to be held in the DisplayName child node of Licensor
+     * @param mandatory if true, an exception will thrown if the displayName is empty
      * @return the created Licensor element
      * @throws ParseException if there is an error and abort-on-error policy is in effect
+     * @throws Exception other error conditions may also throw exceptions
      */
     protected Element mPublisher(String name, String displayName, boolean mandatory) throws Exception {
         if (displayName.equals("")) {
@@ -314,6 +320,7 @@ public abstract class SheetRow {
      * Generate Start or StartCondition
      * @param val start time
      * @return a Start element
+     * @throws Exception if an error condition is encountered
      */
     protected Element mStart(String val) throws Exception {
         Element e = null;

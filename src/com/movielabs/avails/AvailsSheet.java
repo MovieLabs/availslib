@@ -15,11 +15,19 @@ import java.util.regex.Pattern;
 
 import org.w3c.dom.*;
 
+/**
+ * Represents an individual sheet of an Excel spreadsheet
+ */
 public class AvailsSheet {
     private ArrayList<SheetRow> rows;
     private AvailSS parent;
     private String name;
 
+    /**
+     * An enum used to represent offsets into an array of spreadsheet cells.  The name() method returns
+     * the Column name (based on Avails spreadsheet representation; the toString() method returns a
+     * corresponding or related XML element; and ordinal() returns the offset
+     */
     private enum COL {
         DisplayName ("DisplayName"),                                   //  0
         StoreLanguage ("StoreLanguage"),                               //  1
@@ -55,6 +63,11 @@ public class AvailsSheet {
         rows = new ArrayList<SheetRow>(initialRows);
     }
 
+    /**
+     * Determine if a spreadsheet row contains an avail
+     * @param fields an array containing the raw values of a spreadsheet row
+     * @return true iff the row is an avail based on the contents of the Territory column
+     */
     public boolean isAvail(String[] fields) {
         String t = fields[COL.Territory.ordinal()];
         boolean ret = (t != null) && 
@@ -70,6 +83,12 @@ public class AvailsSheet {
         return rows;
     }
 
+    /**
+     * helper routine to create a log entry
+     * @param s the data to be logged
+     * @param bail if true, throw a ParseException after logging the message
+     * @throws ParseException if bail is true
+     */
     private void log(String s, boolean bail) throws Exception {
         s = String.format("Sheet %s: %s", name, s);
         parent.getLogger().warn(s);
@@ -77,6 +96,12 @@ public class AvailsSheet {
             throw new ParseException(s, 0);
     }
 
+    /**
+     * Add a row of spreadsheet data
+     * @param fields an array containing the raw values of a spreadsheet row 
+     * @throws Exception if an invalid workType is encountered
+     *         (currently, only 'movie', 'episode', or 'season' are acceptd)
+     */
     public void addRow(String[] fields) throws Exception {
 
         String workType = fields[COL.WorkType.ordinal()];
@@ -119,6 +144,12 @@ public class AvailsSheet {
         return parent;
     }
 
+    /**
+     * Create an Avails XML document based on the data in this spreadsheet
+     * @param shortDesc a short description that will appear in the document
+     * @return a JAXP document
+     * @throws Exception if any errors are encountered
+     */
     public Document makeXML(String shortDesc) throws Exception {
         Document dom = null;
         Element root;
@@ -173,6 +204,12 @@ public class AvailsSheet {
         return dom;
     }
 
+    /**
+     * Create an Avails XML file based on the data in this spreadsheet
+     * @param xmlFile the name of the created XML output file
+     * @param shortDesc a short description that will appear in the document
+     * @throws Exception if any errors are encountered
+     */
     public void makeXMLFile(String xmlFile, String shortDesc) throws Exception {
         try {
             Document dom = makeXML(shortDesc);

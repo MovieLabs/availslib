@@ -16,8 +16,16 @@ import java.util.regex.Pattern;
 
 import org.w3c.dom.*;
 
+/**
+ * A subclass representing an Avails movie
+ */
 public class Movie extends SheetRow {
 
+    /**
+     * An enum used to represent offsets into an array of spreadsheet cells.  The name() method returns
+     * the Column name (based on Avails spreadsheet representation; the toString() method returns a
+     * corresponding or related XML element; and ordinal() returns the offset
+     */
     private enum COL {
         DisplayName ("DisplayName"),                               //  0
         StoreLanguage ("StoreLanguage"),                           //  1
@@ -80,6 +88,11 @@ public class Movie extends SheetRow {
         }
     } /* COL */
 
+    /**
+     * Create a Metadata element and append it to the parent; called from superclass
+     * @param asset parent node
+     * @return created EpisodeMetadata element
+     */
     protected Element mAssetBody(Element asset) throws Exception{
         Element e;
         String contentID = fields[COL.ContentID.ordinal()];
@@ -195,6 +208,11 @@ public class Movie extends SheetRow {
         return asset;
     } /* mAssetBody() */
 
+    /**
+     * populate a Transaction element; called from superclass
+     * @param transaction parent node
+     * @return transaction parent node
+     */
     protected Element mTransactionBody(Element transaction) throws Exception {
         Element e;
         

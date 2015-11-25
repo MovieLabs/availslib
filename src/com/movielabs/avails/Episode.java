@@ -16,8 +16,16 @@ import java.util.regex.Pattern;
 
 import org.w3c.dom.*;
 
+/**
+ * A subclass representing an Avails episode
+ */
 public class Episode extends SheetRow {
 
+    /**
+     * An enum used to represent offsets into an array of spreadsheet cells.  The name() method returns
+     * the Column name (based on Avails spreadsheet representation; the toString() method returns a
+     * corresponding or related XML element; and ordinal() returns the offset
+     */
     private enum COL {
         DisplayName ("DisplayName"),                                   //  0
         StoreLanguage ("StoreLanguage"),                               //  1
@@ -94,6 +102,14 @@ public class Episode extends SheetRow {
         }
     } /* COL */
     
+    /**
+     * Helper routine to create TitleDisplayElement element and append it to parent node
+     * @param metadata parent node
+     * @param col primary field; a node with this name is created
+     * @param rcol replacement field; value will be assigned to col if it is currently the empty string
+     * @param sub substitute field; value will be assigned to col if both it and rcol are empty string
+     * @throws Exception if an error is encountered
+     */
     private void TDUHelper(Element metadata, COL col, COL rcol, String sub) throws Exception {
         Element e;
         if (sub != null) {
@@ -107,6 +123,12 @@ public class Episode extends SheetRow {
             metadata.appendChild(e);
     }
 
+    /**
+     * Helper routine to create AlternateID element
+     * @param metadata parent node
+     * @param col primary field; a node with this name is created and append it to parent node
+     * @throws Exception if an error is encountered
+     */
     private void altIDHelper(Element metadata, COL col) throws Exception {
         if (!fields[col.ordinal()].equals("")) { // optional
             Element altID = dom.createElement(col.toString());
@@ -124,6 +146,11 @@ public class Episode extends SheetRow {
         }
     }
 
+    /**
+     * Create an EpisodeMetadata element and append it to the parent; called from superclass
+     * @param asset parent node
+     * @return created EpisodeMetadata element
+     */
     protected Element mAssetBody(Element asset) throws Exception {
         Element e;
         Attr attr;
@@ -295,6 +322,11 @@ public class Episode extends SheetRow {
         return asset;
     } /* mAssetBody() */
 
+    /**
+     * populate a Transaction element; called from superclass
+     * @param transaction parent node
+     * @return transaction parent node
+     */
     protected Element mTransactionBody(Element transaction) throws Exception {
         Element e;
         

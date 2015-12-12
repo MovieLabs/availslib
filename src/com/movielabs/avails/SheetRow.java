@@ -52,6 +52,14 @@ public abstract class SheetRow {
         "Season Only"
     };
 
+    /**
+     * Create an object representing a spreadsheet row (this is a super-class, should not
+     * be instantiated directly!)
+     * @param parent the parent sheet object
+     * @param workType must be either "Movie", "Episode", or "Season"
+     * @param lineNo the row number corresponding to this row's position in the sheet (1-based)
+     * @param fields an array containing each cell value of the row (as a string)
+     */
     public SheetRow(AvailsSheet parent, String workType, int lineNo, String[] fields) {
         this.parent = parent;
         this.workType = workType;

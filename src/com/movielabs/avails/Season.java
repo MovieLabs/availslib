@@ -327,6 +327,11 @@ public class Season extends SheetRow {
         return transaction;
     } /* mTransaction() */
 
+    /**
+     * Make an XML avail from a row of spreadsheet avails data
+     * @param dom the JAXP object where the created avail will be located
+     * @return a JAXP Element representing this avail
+     */
     public Element makeAvail(Document dom) throws Exception {
         this.dom = dom;
         Element avail = dom.createElement("Avail");
@@ -364,6 +369,13 @@ public class Season extends SheetRow {
         return avail;
     }
 
+    /**
+     * Create an object spreadsheet row representing a TV Season avail
+     * @param parent the parent sheet object
+     * @param workType must be either "Movie", "Episode", or "Season"
+     * @param lineNo the row number corresponding to this row's position in the sheet (1-based)
+     * @param fields an array containing each cell value of the row (as a string)
+     */
     public Season(AvailsSheet parent, String workType, int lineNo, String[] fields) {
         super(parent, workType, lineNo, fields);
     }

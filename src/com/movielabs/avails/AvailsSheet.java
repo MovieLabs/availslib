@@ -51,12 +51,23 @@ public class AvailsSheet {
         }
     } /* COL */
 
+    /**
+     * Create an object representing a single sheet of a spreadsheet
+     * @param parent the parent Spreadsheet object
+     * @param name the name of the spreadsheet
+     */
     public AvailsSheet(AvailSS parent, String name) {
         this.parent = parent;
         this.name = name;
         rows = new ArrayList<SheetRow>();
     }
 
+    /**
+     * Create an object representing a single sheet of a spreadsheet
+     * @param parent the parent Spreadsheet object
+     * @param name the name of the spreadsheet
+     * @param initialRows an estimate of the number of rows in this sheet
+     */
     public AvailsSheet(AvailSS parent, String name, int initialRows) {
         this.parent = parent;
         this.name = name;
@@ -79,6 +90,10 @@ public class AvailsSheet {
         return name;
     }
 
+    /**
+     * Get a an array of objects representing each row of this sheet
+     * @return an array containing all the SheetRow objects in this sheet
+     */
     public ArrayList<SheetRow> getRows() {
         return rows;
     }
@@ -106,7 +121,7 @@ public class AvailsSheet {
 
         String workType = fields[COL.WorkType.ordinal()];
 
-        if (!(workType.equals("Movie") || workType.equals("Episode"))) {
+        if (!(workType.equals("Movie") || workType.equals("Episode") || workType.equals("Season"))) {
             if (parent.getCleanupData()) {
                 Pattern pat = Pattern.compile("^\\s*(movie|episode|season)\\s*$", Pattern.CASE_INSENSITIVE);
                 Matcher m = pat.matcher(workType);
@@ -140,6 +155,10 @@ public class AvailsSheet {
         rows.add(sr);
     }
 
+    /**
+     * get the parent Spreadsheet object for this sheet
+     * @return the parent of this sheet
+     */
     public AvailSS getAvailSS() {
         return parent;
     }

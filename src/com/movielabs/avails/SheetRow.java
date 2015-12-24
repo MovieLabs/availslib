@@ -22,7 +22,7 @@ import org.apache.logging.log4j.*;
  */
 public abstract class SheetRow {
     protected AvailsSheet parent;
-    protected int lineNo;
+    protected int rowNum;
     protected String[] fields;
     protected Logger log;
     protected Document dom;
@@ -32,7 +32,8 @@ public abstract class SheetRow {
     protected boolean cleanupData;
     protected String workType;
     protected String shortDesc;
-    protected static final String[] ISO3166 = Locale.getISOCountries();
+    protected static final String[] ISO3166  = Locale.getISOCountries();
+    protected static final String[] ISO639   = Locale.getISOLanguages();
     
     protected static String[] LRD  =  { // Controlled vocabulary, must be sorted
         "DD-DVD",
@@ -57,13 +58,13 @@ public abstract class SheetRow {
      * be instantiated directly!)
      * @param parent the parent sheet object
      * @param workType must be either "Movie", "Episode", or "Season"
-     * @param lineNo the row number corresponding to this row's position in the sheet (1-based)
+     * @param rowNum the row number corresponding to this row's position in the sheet (1-based)
      * @param fields an array containing each cell value of the row (as a string)
      */
-    public SheetRow(AvailsSheet parent, String workType, int lineNo, String[] fields) {
+    public SheetRow(AvailsSheet parent, String workType, int rowNum, String[] fields) {
         this.parent = parent;
         this.workType = workType;
-        this.lineNo = lineNo;
+        this.rowNum = rowNum;
         this.fields = fields;
         this.log = getLogger();
         this.exitOnError = parent.getAvailSS().getExitOnError();
@@ -152,10 +153,11 @@ public abstract class SheetRow {
         if (ratingSystem.equals("")) { // optional
             if (!(ratingValue.equals("") && ratingReason.equals("")))
                 reportError("RatingSystem not specified");
+            else
+            	return;
         }
-        if (Arrays.binarySearch(ISO3166, territory) == -1) { // validate legit ISO 3166-1 alpha-2
+        if (!isValidISO3166_2(territory)) // validate legit ISO 3166-1 alpha-2
             reportError("invalid Country Code: " + territory);
-        }
         Element ratings = dom.createElement("Ratings");
         Element rat = dom.createElement("md:Rating");
         ratings.appendChild(rat);
@@ -177,7 +179,7 @@ public abstract class SheetRow {
 
     protected Element mCount(String name, String val) throws Exception {
         if (val.equals(""))
-            reportError("missing required value on element: " + name);
+            reportError("missing required count value on element: " + name);
         Element tia = dom.createElement(name);
         Element e = dom.createElement("md:Number");
         int n = normalizeInt(val);
@@ -307,7 +309,7 @@ public abstract class SheetRow {
     }
 
     protected Element mTerritory(String val) throws Exception {
-        if (Arrays.binarySearch(ISO3166, val) == -1) // validate legit ISO 3166-1 alpha-2
+        if (!isValidISO3166_2(val)) // validate legit ISO 3166-1 alpha-2
             reportError("invalid Country Code: " + val);
         Element e = dom.createElement("Territory");
         Element e2 = mGenericElement("md:country", val, true);
@@ -369,13 +371,9 @@ public abstract class SheetRow {
         return e;
     }
 
-    // XXX RFC 5646/BCP 77 validation needed
     protected Element mStoreLanguage(String val) throws Exception {
-        try {
-            Locale aLocale = new Locale.Builder().setLanguage(val).build();
-        } catch (IllformedLocaleException e) {
-            reportError("invalid Locale: " + val + " (" + e + ")");
-        }
+        if (!isValidLanguageTag(val)) // RFC 5646/BCP 47 validation
+            reportError("invalid language tag: '" + val + "'");
         return mGenericElement("StoreLanguage", val, false);
     }
 
@@ -456,8 +454,10 @@ public abstract class SheetRow {
         return e;
     }
 
-    protected Element makeLanguageTerm(String name, String value) {
+    protected Element makeLanguageTerm(String name, String value) throws Exception {
         // XXX validate
+        if (!isValidLanguageTag(value))
+            reportError("Suspicious Language Tag: " + value);
         Element e = dom.createElement("Term");   
         Attr attr = dom.createAttribute("termName");
         attr.setValue(name);
@@ -556,17 +556,17 @@ public abstract class SheetRow {
 
     protected Element mCaptionsExemptionReason(String captionIncluded, String captionExemption,
                                                String territory) throws Exception {
-        // XXX clarify policy regarding non-US captioning
-        //        if (territory.equals("US")) {  // check captions
-            switch(yesorno(captionIncluded)) {
-            case 1:
-                if (!captionExemption.equals(""))
-                    reportError("CaptionExemption specified without CaptionIncluded");
-                break;
-            case 0:
-                if (captionExemption.equals(""))
-                    reportError("CaptionExemption not specified");
-                int exemption;
+        int exemption = 0;
+        switch(yesorno(captionIncluded)) {
+        case 1: // yes, caption is included
+            if (!captionExemption.equals(""))
+                reportError("CaptionExemption specified without CaptionIncluded");
+            break;
+        case 0: // no, captions not included
+            if (captionExemption.equals("")) {
+                reportError("Captions not included and CaptionExemption not specified");
+                return null;
+            } else {
                 try {
                     exemption = normalizeInt(captionExemption);
                 } catch(NumberFormatException s) {
@@ -578,16 +578,18 @@ public abstract class SheetRow {
                 Text tmp = dom.createTextNode(Integer.toString(exemption));
                 capex.appendChild(tmp);
                 return capex;
-            default:
-                reportError("CaptionExemption specified without CaptionIncluded");
             }
-            // } else {
-            // if (captionIncluded.equals("") && captionExemption.equals(""))
-            //     return null;
-            // else
-            //     reportError("CaptionIncluded/Exemption should only be specified in US");
-            // }
-            return null;
+            // break
+        default:
+            reportError("CaptionExemption specified without CaptionIncluded");
+        }
+        // } else {
+        // if (captionIncluded.equals("") && captionExemption.equals(""))
+        //     return null;
+        // else
+        //     reportError("CaptionIncluded/Exemption should only be specified in US");
+        // }
+        return null;
     }
 
 
@@ -620,6 +622,49 @@ public abstract class SheetRow {
      ****************************************/
 
     /**
+     * Validate argument is an ISO 639-2 (3-character) language code
+     * @param val the character string to test
+     * @return true iff it is a valid code
+     */
+    protected boolean isValidISO639_2(String val) {
+        try {
+            ISO639_2_Code code = ISO639_2_Code.fromValue(val);
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Perform partial validation to determine if a string is a valid RFC 5646 language tag
+     * @param val the string to be tested
+     * @return true iff val is a valid language tag
+     * @throws Exception 
+     */
+    protected boolean isValidLanguageTag(String val) throws Exception {
+        Pattern pat = Pattern.compile("^([a-zA-Z]{2,3})(?:-[a-zA-Z0-9]+)*$");
+        Matcher m = pat.matcher(val);
+        boolean ret = false;
+        if (m.matches()) {
+            String lang = m.group(1).toLowerCase();
+            ret = ((Arrays.binarySearch(ISO639, lang) >= 0) ||
+                   isValidISO639_2(lang));
+        }
+        if (!ret)
+            reportError("Suspicious Language Tag: " + val);
+        return ret;
+    }
+
+    /**
+     * Determine if a string is a valid ISO 3066-2 country code
+     * @param val the string to be tested
+     * @return true iff val is a valid code
+     */
+    protected boolean isValidISO3166_2(String val) {
+        return Arrays.binarySearch(ISO3166, val) != -1;
+    }
+
+    /**
      * logs an error and potentially throws an exception.  The error
      * is decorated with the current Sheet name and the row being
      * processed
@@ -627,7 +672,7 @@ public abstract class SheetRow {
      * @throws ParseException if exit-on-error policy is in effect
      */
     protected void reportError(String s) throws Exception {
-        s = String.format("Line %05d: %s", lineNo, s);
+        s = String.format("Row %5d: %s", rowNum, s);
         log.warn(s);
         if (exitOnError)
             throw new ParseException(s, 0);

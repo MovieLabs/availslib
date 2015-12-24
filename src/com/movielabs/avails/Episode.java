@@ -408,13 +408,13 @@ public class Episode extends SheetRow {
         }
 
         // HoldbackLanguage Term
-        val = fields[COL.HoldbackLanguage.ordinal()];
+        val = fields[COL.HoldbackLanguage.ordinal()].trim();
         if (!val.equals("")) {
             transaction.appendChild(makeLanguageTerm(COL.HoldbackLanguage.toString(), val));
         }
 
         // HoldbackExclusionLanguage Term
-        val = fields[COL.HoldbackExclusionLanguage.ordinal()];
+        val = fields[COL.HoldbackExclusionLanguage.ordinal()].trim();
         if (!val.equals("")) {
             transaction.appendChild(makeLanguageTerm(COL.HoldbackExclusionLanguage.toString(), val));
         }

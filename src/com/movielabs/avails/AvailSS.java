@@ -38,7 +38,7 @@ public class AvailSS {
     }
 
     /**
-     * Add a sheet from an Excel spreadsheet to a spreatsheet object
+     * Add a sheet from an Excel spreadsheet to a spreadsheet object
      * @param wb an Apache POI workbook object
      * @param sheet an Apache POI sheet object
      * @return created sheet object
@@ -46,19 +46,43 @@ public class AvailSS {
     private AvailsSheet addSheetHelper(Workbook wb, Sheet sheet) throws Exception {
         AvailsSheet as = new AvailsSheet(this, sheet.getSheetName());
 
+//        int qq = 0;
         for (Row row : sheet) {
-            int len = 0;
-            for (Cell cell : row) len++;
-            if (len <= 0)
-                break;
+//        	qq++;
+            int len = row.getLastCellNum();
+            if (len < 0)
+            	continue;
             String[] fields = new String[len];
+            for (int i=0; i<len; i++) // XXX: don't want nulls
+                fields[i] = "";
             for (Cell cell : row) {
                 int idx = cell.getColumnIndex();
-                fields[idx] = cell.toString();
-            }
+                int type = cell.getCellType();
+                switch(type) {
+                case 0: // Numeric
+                    double v = cell.getNumericCellValue();
+                    if (v < 0.5) { // XXX hack: assume TotalRunTime
+                        java.util.Date d = cell.getDateCellValue();
+                        fields[idx] = String.format("%02d:%02d:%02d", d.getHours(),
+                                                    d.getMinutes(), d.getSeconds());
+                        //System.out.println("run=" + tmp);
+                    } else {
+                        fields[idx] = cell.toString();
+                    }
+                    break;
+                case 1: // String
+                case 3: // Blank
+                    fields[idx] = cell.getStringCellValue().trim();
+                    break;
+                default:
+                    //logger.warn("Cell[" + i + "," + idx + "]: invalid type (" + type + ")");
+                    fields[idx] = cell.toString();
+                    break;
+                }
+            } /* cell */
             if (as.isAvail(fields))
-                as.addRow(fields);
-        }
+                as.addRow(fields, row.getRowNum() + 1);
+        } /* row */
         sheets.add(as);
         return as;
     }

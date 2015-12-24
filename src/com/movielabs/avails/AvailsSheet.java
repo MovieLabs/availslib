@@ -82,7 +82,8 @@ public class AvailsSheet {
     public boolean isAvail(String[] fields) {
         String t = fields[COL.Territory.ordinal()];
         boolean ret = (t != null) && 
-            !(t.equals("AvailTrans") || t.equals("Territory") || t.substring(0, 2).equals("//"));
+            !(t.equals("AvailTrans") || t.equals("Territory") || 
+              (t.length() >= 2 && t.substring(0, 2).equals("//")));
         return ret;
     }
 
@@ -104,8 +105,8 @@ public class AvailsSheet {
      * @param bail if true, throw a ParseException after logging the message
      * @throws ParseException if bail is true
      */
-    private void log(String s, boolean bail) throws Exception {
-        s = String.format("Sheet %s: %s", name, s);
+    private void log(String s, int rowNum, boolean bail) throws Exception {
+        s = String.format("Sheet %s Row %5d: %s", name, rowNum, s);
         parent.getLogger().warn(s);
         if (bail)
             throw new ParseException(s, 0);
@@ -114,10 +115,11 @@ public class AvailsSheet {
     /**
      * Add a row of spreadsheet data
      * @param fields an array containing the raw values of a spreadsheet row 
+     * @param rowNum the row number from the source spreadsheet
      * @throws Exception if an invalid workType is encountered
-     *         (currently, only 'movie', 'episode', or 'season' are acceptd)
+     *         (currently, only 'movie', 'episode', or 'season' are accepted)
      */
-    public void addRow(String[] fields) throws Exception {
+    public void addRow(String[] fields, int rowNum) throws Exception {
 
         String workType = fields[COL.WorkType.ordinal()];
 
@@ -126,30 +128,30 @@ public class AvailsSheet {
                 Pattern pat = Pattern.compile("^\\s*(movie|episode|season)\\s*$", Pattern.CASE_INSENSITIVE);
                 Matcher m = pat.matcher(workType);
                 if (m.matches()) {
-                    log("corrected from '" + workType + "'", false);
+                    log("corrected from '" + workType + "'", rowNum, false);
                     workType = m.group(1).substring(0, 1).toUpperCase() + m.group(1).substring(1).toLowerCase();
                 } else {
-                    log("invalid workType: " + workType, true);
+                    log("invalid workType: '" + workType + "'", rowNum, false);
                     return;
                 }
             } else {
-                log("invalid workType: " + workType, true);
+                log("invalid workType: '" + workType + "'", rowNum, false);
                 return;
             }
         }
         SheetRow sr;
         switch(workType) {
         case "Movie": 
-            sr = new Movie(this, "Movie", rows.size() + 1, fields);
+            sr = new Movie(this, "Movie", rowNum, fields);
             break;
         case "Episode":
-            sr = new Episode(this, "Episode", rows.size() + 1, fields);
+            sr = new Episode(this, "Episode", rowNum, fields);
             break;
         case "Season":
-        	sr = new Season(this, "Season", rows.size() + 1, fields);
-        	break;
+            sr = new Season(this, "Season", rowNum, fields);
+            break;
         default:
-            log("invalid workType: " + workType, true);
+            log("invalid workType: " + workType, rowNum, true);
             return;
         }
         rows.add(sr);

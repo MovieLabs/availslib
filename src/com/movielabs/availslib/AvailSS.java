@@ -23,7 +23,7 @@
  * Author: Paul Jensen <pgj@movielabs.com>
  */
 
-package com.movielabs.avails;
+package com.movielabs.availslib;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;

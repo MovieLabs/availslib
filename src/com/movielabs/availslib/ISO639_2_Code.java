@@ -23,7 +23,7 @@
  * Author: Paul Jensen <pgj@movielabs.com>
  */
 
-package com.movielabs.avails;
+package com.movielabs.availslib;
 
 public enum ISO639_2_Code {
     /**

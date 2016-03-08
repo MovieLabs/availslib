@@ -23,7 +23,7 @@
  * Author: Paul Jensen <pgj@movielabs.com>
  */
 
-package com.movielabs.avails;
+package com.movielabs.availslib;
 import java.io.*;
 import java.util.*;
 import java.text.ParseException;

@@ -5,4 +5,4 @@
  * @author pgj
  *
  */
-package com.movielabs.avails;
+package com.movielabs.availslib;

@@ -19,7 +19,7 @@ README - availslib
 > git remote add github https://github.com/pgj-ml/availslib.git
 > git fetch github
 
-3) Building availslib: Eclipse was used for initial development;
+2) Building availslib: Eclipse was used for initial development;
    however any IDE should work equally well.  In addition to the
    source files you will need the following libraries:
    
@@ -35,17 +35,17 @@ README - availslib
        * apache-log4j-2.4.1-bin/log4j-api-2.4.1.jar
        * apache-log4j-2.4.1-bin/log4j-core-2.4.1.jar
      
-4) Documentation: the source code has JavaDoc annotations.  You need
+3) Documentation: the source code has JavaDoc annotations.  You need
    to install a Javadoc processor to generate html-based
    documentation.  This is usually provided by your IDE, but you can
    refer here for more information:
 
    http://www.oracle.com/technetwork/articles/java/index-jsp-135444.html
 
-5) Test and verification: to perform a quick test of avilslib, use the
+4) Test and verification: to perform a quick test of avilslib, use the
    "availstool" command-line utility.  This can also be found on
    github at:
 
    https://github.com/pgj-ml/availslib.git
 
-6) for further information: contact Paul Jensen (pgj@movielabs.com)
+5) for further information: contact Paul Jensen (pgj@movielabs.com)

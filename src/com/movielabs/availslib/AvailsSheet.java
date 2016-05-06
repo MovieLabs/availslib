@@ -233,9 +233,9 @@ public class AvailsSheet {
 
             dom.appendChild(root);
 
-            int lineNo = 0;
+            //int lineNo = 0;
             for (SheetRow r : rows) {
-                lineNo++;
+                //lineNo++;
                 if (shortDesc != null & !shortDesc.equals(""))
                     r.setShortDesc(shortDesc);
                 Element e = r.makeAvail(dom);

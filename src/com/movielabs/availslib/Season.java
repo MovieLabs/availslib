@@ -24,21 +24,6 @@
  */
 
 package com.movielabs.availslib;
-import java.io.*;
-import java.util.*;
-import java.text.ParseException;
-import java.lang.NumberFormatException;
-
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
-import javax.xml.transform.*;
-
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import org.w3c.dom.*;
 
 /**
@@ -98,7 +83,7 @@ public class Season extends SheetRow {
         ExceptionFlag ("ExceptionFlag"),                               // 43
         RatingSystem ("md:System"),                                    // 44
         RatingValue ("md:Value"),                                      // 45
-        RatingReason ("md:RatingReason"),                              // 46
+        RatingReason ("md:Reason"),                                    // 46
         RentalDuration ("RentalDuration"),                             // 47
         WatchDuration ("WatchDuration"),                               // 48
         FixedEndDate ("FixedEndDate"),                                 // 49

@@ -24,17 +24,9 @@
  */
 
 package com.movielabs.availslib;
-import java.io.*;
 import java.util.*;
 import java.text.ParseException;
 import java.lang.NumberFormatException;
-
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
-import javax.xml.transform.*;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -196,9 +188,13 @@ public abstract class SheetRow {
         rat.appendChild(region);
         rat.appendChild(mGenericElement("md:System", ratingSystem, true));
         rat.appendChild(mGenericElement("md:Value", ratingValue, true));
-        Element reason = mGenericElement("md:RatingReason", ratingReason, false);
-        if (reason != null)
-            rat.appendChild(reason);
+        if (!ratingReason.equals("")) {
+            String[] reasons = ratingReason.split(",");
+            for (String s: reasons) {
+                Element reason = mGenericElement("md:Reason", s, true);
+                    rat.appendChild(reason);
+            }
+        }
         m.appendChild(ratings);
     }
 
@@ -653,7 +649,7 @@ public abstract class SheetRow {
      */
     protected boolean isValidISO639_2(String val) {
         try {
-            ISO639_2_Code code = ISO639_2_Code.fromValue(val);
+            /* ISO639_2_Code code = */ ISO639_2_Code.fromValue(val);
         } catch (IllegalArgumentException e) {
             return false;
         }

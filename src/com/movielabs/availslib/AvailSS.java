@@ -25,8 +25,6 @@
 
 package com.movielabs.availslib;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.util.*;
 
 import org.apache.logging.log4j.*;
@@ -43,7 +41,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 public class AvailSS {
     private String file;
     private ArrayList<AvailsSheet> sheets;
-    private static Logger logger;
+    private Logger logger;
     private boolean exitOnError;
     private boolean cleanupData;
 

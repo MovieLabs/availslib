@@ -1,6 +1,28 @@
+/*
+ * Copyright (c) 2016 MovieLabs
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+ * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+ * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+ * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ *
+ * Author: Paul Jensen <pgj@movielabs.com>
+ */
 package com.movielabs.availslib;
-
-//import java.io.IOException;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -12,16 +34,13 @@ import java.util.List;
 
 import org.apache.logging.log4j.*;
 
+//import javax.xml.parsers.DocumentBuilder;
+//import javax.xml.parsers.DocumentBuilderFactory;
+//import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Unmarshaller;
-//import javax.xml.parsers.DocumentBuilder;
-//import javax.xml.parsers.DocumentBuilderFactory;
-//import javax.xml.parsers.ParserConfigurationException;
-
-
-
 import javax.xml.datatype.Duration;
 import javax.xml.datatype.XMLGregorianCalendar;
 
@@ -49,9 +68,6 @@ import org.apache.poi.ss.usermodel.Sheet;
 
 public class AvailXML {
 
-    // DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-    // DocumentBuilder builder = factory.newDocumentBuilder();
-    // Document doc = builder.parse(xmlFile);
     protected String xmlFile;
     protected Logger logger;
     protected JAXBContext jaxbContext;
@@ -139,9 +155,6 @@ public class AvailXML {
         POIXMLProperties.CoreProperties coreProps =  xmlProps.getCoreProperties();
         coreProps.setDescription("created by availslib from '" + xmlFile + "'");
 
-        initMovieSheet();
-        initEpisodeSheet();
-
         for (AvailType a : availList)
             handleAvail(a);
 
@@ -158,7 +171,10 @@ public class AvailXML {
         }
     }
 
+    protected boolean movieSheetInitialized = false;
     protected void initMovieSheet() {
+        if (movieSheetInitialized)
+            return;
         movieSheet = workbook.createSheet("Movie");
         currentMovieRow = 0;
         for (String[] sa : movieRows) {
@@ -168,10 +184,14 @@ public class AvailXML {
                 Cell cell = row.createCell(j++);
                 cell.setCellValue(s);
             }
-        }   
+        }
+        movieSheetInitialized = true;
     }
 
+    protected boolean episodeSheetInitialized = false;
     protected void initEpisodeSheet() {
+        if (episodeSheetInitialized)
+            return;
         episodeSheet = workbook.createSheet("Episode");
         currentEpisodeRow = 0;
         for (String[] sa : episodeRows) {
@@ -182,6 +202,7 @@ public class AvailXML {
                 cell.setCellValue(s);
             }
         }
+        episodeSheetInitialized = true;
     }
 
     protected void addMovieRow(AvailType a) {
@@ -547,12 +568,15 @@ public class AvailXML {
         String workType = assets.get(0).getWorkType();
         switch(workType) {
         case "Movie":
+            initMovieSheet();
             addMovieRow(a);
             break;
         case "Episode":
+            initEpisodeSheet();
             addEpisodeRow(a);
             break;
         case "Season":
+            initEpisodeSheet();
             addSeasonRow(a);
             break;
         default:

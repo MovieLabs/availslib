@@ -24,21 +24,6 @@
  */
 
 package com.movielabs.availslib;
-import java.io.*;
-import java.util.*;
-import java.text.ParseException;
-import java.lang.NumberFormatException;
-
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
-import javax.xml.transform.*;
-
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import org.w3c.dom.*;
 
 /**
@@ -85,7 +70,7 @@ public class Movie extends SheetRow {
         ExceptionFlag ("ExceptionFlag"),                           // 30
         RatingSystem ("md:System"),                                // 31
         RatingValue ("md:Value"),                                  // 32
-        RatingReason ("md:RatingReason"),                          // 33
+        RatingReason ("md:Reason"),                                // 33
         RentalDuration ("RentalDuration"),                         // 34
         WatchDuration ("WatchDuration"),                           // 35
         CaptionIncluded ("USACaptionsExemptionReason"),            // 36

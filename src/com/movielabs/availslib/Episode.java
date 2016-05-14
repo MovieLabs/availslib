@@ -326,6 +326,17 @@ public class Episode extends SheetRow {
             seriesMetadata.appendChild(e);
         }
 
+        // CompanyDisplayCredit
+        String cDC = fields[COL.CompanyDisplayCredit.ordinal()];
+        if (!cDC.equals("")) {
+            e = dom.createElement(COL.CompanyDisplayCredit.toString());
+            Element e2 = dom.createElement("md:DisplayString");
+            tmp = dom.createTextNode(cDC);
+            e2.appendChild(tmp);
+            e.appendChild(e2);
+            seriesMetadata.appendChild(e);
+        }
+
         seasonMetadata.appendChild(seriesMetadata);
 
         asset.appendChild(episodeMetadata);

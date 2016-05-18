@@ -359,10 +359,11 @@ public class AvailXML {
         return j;
     } /* createTransactions1() */
 
-    private class Hack {
+    private class Hack {  // C# out parameters would be nicer :-(
         public String suppressionLiftDate;
         public Duration rentalDuration;
         public Duration watchDuration;
+        public String fixedEndDate;
         public String anyTerm;
         public String holdbackLanguage;
         public String holdbackExclusionLanguage;
@@ -379,10 +380,11 @@ public class AvailXML {
         h.suppressionLiftDate = "";
         h.rentalDuration = null;
         h.watchDuration = null;
+        h.fixedEndDate = "";
         h.anyTerm = "";
         h.holdbackLanguage = "";
         h.holdbackExclusionLanguage = "";
-        int count[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+        int count[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
         for (AvailTransType.Term t : terms) { // this is n^2 but there aren't many terms so big deal
             String name = t.getTermName();
             switch(name.toLowerCase()) {
@@ -445,22 +447,29 @@ public class AvailXML {
                     logger.warn("duplicate 'WatchDuration' term");
                 }
                 break;
-            case "any":
+            case "fixedenddate":
                 if (count[7]++ == 0) {
+                    h.fixedEndDate = t.getEvent();
+                } else {
+                    logger.warn("duplicate 'FixedEndDate' term");
+                }
+                break;
+            case "any":
+                if (count[8]++ == 0) {
                     h.anyTerm = t.getText();
                 } else {
                     logger.warn("duplicate 'Any' term");
                 }
                 break;
             case "holdbacklanguage":
-                if (count[8]++ == 0) {
+                if (count[9]++ == 0) {
                     h.holdbackLanguage = t.getLanguage();
                 } else {
                     logger.warn("duplicate 'HoldbackLanguage' term");
                 }
                 break;
             case "holdbackexclusionlanguage":
-                if (count[9]++ == 0) {
+                if (count[10]++ == 0) {
                     h.holdbackExclusionLanguage = t.getLanguage();
                 } else {
                     logger.warn("duplicate 'HoldbackExclusionLanguage' term");
@@ -493,6 +502,142 @@ public class AvailXML {
 
         return j;
     } /* createTransactions2() */
+
+    protected int createMetadataAndTransactions(int j, Row row, AvailType avail, AvailTransType trans,
+                                                AvailMetadataType metadata, Hack h) {
+        Cell cell;
+
+        // ReleaseYear
+        cell = row.createCell(j++);
+        cell.setCellValue(metadata.getReleaseDate());
+
+        // ReleaseHistoryOriginal
+        String releaseHistoryPhysicalHV = "";
+        String releaseHistoryOriginal = "";
+        cell = row.createCell(j++);
+        List<ReleaseHistoryType> relHistory = metadata.getReleaseHistory();
+        for (ReleaseHistoryType rh : relHistory) {
+            String rhType = rh.getReleaseType().getValue();
+            switch(rhType) {
+            case "DVD":
+                releaseHistoryPhysicalHV = rh.getDate().getValue();
+                break;
+            case "original":
+                releaseHistoryOriginal = rh.getDate().getValue();
+                break;
+            default:
+                logger.warn("unknown release history: " + rhType);
+                break;
+            }
+        }
+        cell.setCellValue(releaseHistoryOriginal);
+
+        // ReleaseHistoryPhysicalHV
+        cell = row.createCell(j++);
+        cell.setCellValue(releaseHistoryPhysicalHV);
+
+        // ExceptionFlag
+        cell = row.createCell(j++);
+        if (avail.isExceptionFlag() != null && avail.isExceptionFlag().booleanValue())
+            cell.setCellValue("YES");
+        else
+            cell.setCellValue("");
+
+        ContentRatingType ratings = metadata.getRatings();
+        if (ratings == null) {
+            j += 3;
+        } else {
+            List<ContentRatingDetailType> rlist = ratings.getRating();
+            if (rlist.size() != 1)
+                logger.warn("more than one rating specified");
+            // RatingSystem
+            cell = row.createCell(j++);
+            cell.setCellValue(rlist.get(0).getSystem());
+            
+            // RatingValue
+            cell = row.createCell(j++);
+            cell.setCellValue(rlist.get(0).getValue());
+
+            // RatingReason
+            cell = row.createCell(j++);
+            List<String> reasons = rlist.get(0).getReason();
+            int i = 0;
+            String s = "";
+            int tmp = reasons.size();
+            for (String r : reasons) {
+                if (i++ > 0)
+                    s += ",";
+                s += r;
+            }
+            cell.setCellValue(s);
+        }
+
+        // RentalDuration
+        cell = row.createCell(j++);
+        if (h.rentalDuration != null)
+            cell.setCellValue(h.rentalDuration.getHours());
+   
+        // WatchDuration
+        cell = row.createCell(j++);
+        if (h.watchDuration != null)
+            cell.setCellValue(h.watchDuration.getHours());
+   
+        // FixedEndDate
+        cell = row.createCell(j++);
+        if (h.fixedEndDate != null)
+            cell.setCellValue(h.fixedEndDate);
+   
+        return j;
+    } /* createMetadataAndTransactions() */
+
+    protected int createLastEight(int j, Row row, AvailType avail, AvailTransType trans,
+                            AvailMetadataType metadata, Hack h) {
+        Cell cell;
+
+        // CaptionIncluded & CaptionExemption
+        BigInteger exemption = metadata.getUSACaptionsExemptionReason();
+        if (exemption != null) {
+            cell = row.createCell(j++);
+            cell.setCellValue("No");                 // CaptionIncluded
+            cell = row.createCell(j++);
+            cell.setCellValue(exemption.intValue()); // CaptionExemption
+        } else {
+            cell = row.createCell(j++);
+            cell.setCellValue("Yes");                // CaptionIncluded
+            j++;                                     // CaptionExemption
+        }
+
+        // Any
+        cell = row.createCell(j++);
+        cell.setCellValue(h.anyTerm);
+
+        // ContractID
+        cell = row.createCell(j++);
+        cell.setCellValue(trans.getContractID());
+
+        // ServiceProvider
+        cell = row.createCell(j++);
+        if (avail.getServiceProvider() != null)
+            cell.setCellValue(avail.getServiceProvider().getDisplayName());
+
+        // TotalRunTime
+        cell = row.createCell(j++);
+        Duration runLength = metadata.getRunLength();
+        if (runLength.getHours() != 0 || runLength.getMinutes() != 0 || runLength.getSeconds() != 0) {
+            cell.setCellValue(String.format("%d:%02d:%02d", runLength.getHours(), runLength.getMinutes(),
+                                            runLength.getSeconds()));
+        }
+
+        // HoldbackLanguage
+        cell = row.createCell(j++);
+        cell.setCellValue(h.holdbackLanguage);
+
+        // HoldbackExclusionLanguage
+        cell = row.createCell(j++);
+        cell.setCellValue(h.holdbackExclusionLanguage);
+
+        return j;
+    } /* createLastEight() */
 
     protected void addMovieRow(AvailType avail) {
         Row row = movieSheet.createRow(currentMovieRow++);
@@ -567,117 +712,13 @@ public class AvailXML {
         // TODO not right
         j++;
 
-        // ReleaseYear
-        cell = row.createCell(j++);
-        cell.setCellValue(metadata.getReleaseDate());
+        // ReleaseYear, ReleaseHistoryOriginal, ReleaseHistoryPhysicalHV, ExceptionFlag, RatingSystem,
+        // RatingValue, RatingReason, RentalDuration, & WatchDuration
+        j = createMetadataAndTransactions(j, row, avail, trans, metadata, h);
 
-        // ReleaseHistoryOriginal
-        String releaseHistoryPhysicalHV = "";
-        String releaseHistoryOriginal = "";
-        cell = row.createCell(j++);
-        List<ReleaseHistoryType> relHistory = metadata.getReleaseHistory();
-        for (ReleaseHistoryType rh : relHistory) {
-            switch(rh.getReleaseType().getValue()) {
-            case "DVD":
-                releaseHistoryPhysicalHV = rh.getDate().getValue();
-                break;
-            case "original":
-                releaseHistoryOriginal = rh.getDate().getValue();
-                break;
-            }
-        }
-        cell.setCellValue(releaseHistoryOriginal);
-
-        // ReleaseHistoryPhysicalHV
-        cell = row.createCell(j++);
-        cell.setCellValue(releaseHistoryPhysicalHV);
-
-        // ExceptionFlag
-        cell = row.createCell(j++);
-        if (avail.isExceptionFlag() != null && avail.isExceptionFlag().booleanValue())
-            cell.setCellValue("YES");
-        else
-            cell.setCellValue("");
-
-        ContentRatingType ratings = metadata.getRatings();
-        if (ratings == null) {
-            j += 3;
-        } else {
-            List<ContentRatingDetailType> rlist = ratings.getRating();
-            if (rlist.size() != 1)
-                logger.warn("more than one rating specified");
-            // RatingSystem
-            cell = row.createCell(j++);
-            cell.setCellValue(rlist.get(0).getSystem());
-            
-            // RatingValue
-            cell = row.createCell(j++);
-            cell.setCellValue(rlist.get(0).getValue());
-
-            // RatingReason
-            cell = row.createCell(j++);
-            List<String> reasons = rlist.get(0).getReason();
-            int i = 0;
-            String s = "";
-            int tmp = reasons.size();
-            for (String r : reasons) {
-                if (i++ > 0)
-                    s += ",";
-                s += r;
-            }
-            cell.setCellValue(s);
-        }
-
-        // RentalDuration
-        cell = row.createCell(j++);
-        if (h.rentalDuration != null)
-            cell.setCellValue(h.rentalDuration.getHours());
-   
-        // WatchDuration
-        cell = row.createCell(j++);
-        if (h.watchDuration != null)
-            cell.setCellValue(h.watchDuration.getHours());
-   
-        BigInteger exemption = metadata.getUSACaptionsExemptionReason();
-        if (exemption != null) {
-            cell = row.createCell(j++);
-            cell.setCellValue("No");                 // CaptionIncluded
-            cell = row.createCell(j++);
-            cell.setCellValue(exemption.intValue()); // CaptionExemption
-        } else {
-            cell = row.createCell(j++);
-            cell.setCellValue("Yes");                // CaptionIncluded
-            j++;                                     // CaptionExemption
-        }
-
-        // Any
-        cell = row.createCell(j++);
-        cell.setCellValue(h.anyTerm);
-
-        // ContractID
-        cell = row.createCell(j++);
-        cell.setCellValue(trans.getContractID());
-
-        // ServiceProvider
-        cell = row.createCell(j++);
-        if (avail.getServiceProvider() != null)
-            cell.setCellValue(avail.getServiceProvider().getDisplayName());
-
-        // TotalRunTime
-        cell = row.createCell(j++);
-        Duration runLength = metadata.getRunLength();
-        if (runLength.getHours() != 0 || runLength.getMinutes() != 0 || runLength.getSeconds() != 0) {
-            cell.setCellValue(String.format("%d:%02d:%02d", runLength.getHours(), runLength.getMinutes(),
-                                            runLength.getSeconds()));
-        }
-
-        // HoldbackLanguage
-        cell = row.createCell(j++);
-        cell.setCellValue(h.holdbackLanguage);
-
-        // HoldbackExclusionLanguage
-        cell = row.createCell(j++);
-        cell.setCellValue(h.holdbackExclusionLanguage);
+        // CaptionIncluded, CaptionExemption, Any, ContractID, ServiceProvider, TotalRunTime,
+        // HoldbackLanguage, & HoldbackExclusionLanguage
+        j = createLastEight(j, row, avail, trans, metadata, h);
     } /* addMovieRow() */
 
     protected void addEpisodeRow(AvailType avail) {
@@ -747,6 +788,47 @@ public class AvailXML {
         Hack h = new Hack();
         j = createTransactions2(j, row, trans, h);
 
+        // SeriesContentID (AG)
+        cell = row.createCell(j++);
+        cell.setCellValue(seriesMetadata.getSeriesContentID());
+
+        // SeasonContentID (AH)
+        cell = row.createCell(j++);
+        cell.setCellValue(seasonMetadata.getSeasonContentID());
+
+        // EpisodeContentID (AI)
+        cell = row.createCell(j++);
+        cell.setCellValue(asset.getContentID());
+        
+        // EpisodeProductID (AJ)
+        cell = row.createCell(j++);
+        cell.setCellValue(episodeMetadata.getEditEIDRS());
+        
+        // EncodeID (AK)
+        cell = row.createCell(j++);
+        cell.setCellValue(episodeMetadata.getEncodeID());
+        
+        // AvailID (AL)
+        cell = row.createCell(j++);
+        cell.setCellValue(avail.getALID());
+        
+        // Metadata (AM)
+        // TODO what is this?
+        j++;
+
+        // SuppressionLiftDate (AN)
+        cell = row.createCell(j++);
+        cell.setCellValue(h.suppressionLiftDate);
+
+        // ReleaseYear (AO), ReleaseHistoryOriginal (AP), ReleaseHistoryPhysicalHV (AQ),
+        // ExceptionFlag (AR), RatingSystem (AS), RatingValue (AT), RatingReason (AU),
+        // RentalDuration (AV), WatchDuration (AW), & FixedEndDate (AX)
+        j = createMetadataAndTransactions(j, row, avail, trans, episodeMetadata, h);
+
+        // CaptionIncluded, CaptionExemption, Any, ContractID, ServiceProvider, TotalRunTime,
+        // HoldbackLanguage, & HoldbackExclusionLanguage
+        j = createLastEight(j, row, avail, trans, episodeMetadata, h);
+
     } /* addEpisodeRow() */
 
     protected void addSeasonRow(AvailType avail) {
@@ -791,6 +873,50 @@ public class AvailXML {
         Hack h = new Hack();
         j = createTransactions2(j, row, trans, h);
 
+        // SeriesContentID (AG)
+        cell = row.createCell(j++);
+        cell.setCellValue(seriesMetadata.getSeriesContentID());
+
+        // SeasonContentID (AH)
+        cell = row.createCell(j++);
+        cell.setCellValue(seasonMetadata.getSeasonContentID());
+
+        // no EpisodeContentID, EpisodeProductID, or EncodeID (AI-AK)
+        j += 3;
+
+        // AvailID (AL)
+        cell = row.createCell(j++);
+        cell.setCellValue(avail.getALID());
+
+        // Metadata (AM)
+        // TODO what is this?
+        j++;
+
+        // SuppressionLiftDate (AN)
+        cell = row.createCell(j++);
+        cell.setCellValue(h.suppressionLiftDate);
+
+        // ReleaseYear (AO)
+        cell = row.createCell(j++);
+        cell.setCellValue(seasonMetadata.getReleaseDate());
+
+        // ReleaseHistoryOriginal (AP), ReleaseHistoryPhysicalHV (AQ)
+        j += 2;
+
+        // ExceptionFlag (AR)
+        cell = row.createCell(j++);
+        if (avail.isExceptionFlag() != null && avail.isExceptionFlag().booleanValue())
+            cell.setCellValue("YES");
+        else
+            cell.setCellValue("");
+
+        // RatingSystem (AS), RatingValue (AT), RatingReason (AU), RentalDuration (AV),
+        // WatchDuration (AW), FixedEndDate (AX), CaptionIncluded (AY), CaptionExemption (AZ)
+        j += 8;
+
+        // Any (BA)
+        cell = row.createCell(j++);
+        cell.setCellValue(h.anyTerm);
     } /* addSeasonRow() */
 
     protected void handleAvail(AvailType avail) {

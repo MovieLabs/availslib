@@ -220,7 +220,7 @@ public class Episode extends SheetRow {
         String date = fields[COL.ReleaseHistoryOriginal.ordinal()];
         if (!date.equals("")) {
             if ((e = mReleaseHistory(COL.ReleaseHistoryOriginal.toString(),
-                                     normalizeDate(date), "Broadcast")) != null)
+                                     normalizeDate(date), "original")) != null)
                 episodeMetadata.appendChild(e);
         }
          

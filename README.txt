@@ -23,6 +23,16 @@ README - availslib
    however any IDE should work equally well.  In addition to the
    source files you will need the following libraries:
    
+   - The availsjaxb library (this contains JAXB classes for the Avails
+     schema.  It is generated with the xjc command via the following steps
+       * create a peer directory to availslib and availstool: call it
+         availsjaxb
+       * Copy avails-v2.0.xsd & xmldsig-core-schema.xsd into availsjaxb
+       * cd into availsjaxb
+       * Execute “xjc avails-v2.0.xsd”  This wiill generate Java files
+         represented these schema (under the com & org subdirectories)
+       * Create a separate project for this directory (e.g. with Eclipse)
+       * Reference the availsjaxb library in the availslib project
    - JRE System Library (JavaSE-1.8 recommended)
    - Apache Poi (https://poi.apache.org/); used the following jars:
        * poi-3.13-20150929.jar

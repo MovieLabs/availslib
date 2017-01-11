@@ -1,6 +1,9 @@
 README - availslib
 ------------------
 
+THIS REPOSITORY IS DEPRECATED and has been superceeded by the MDDF repository https://github.com/MovieLabs/mddf
+===============================================================================================================
+
 0) Introduction: "availslib" is a Java library with methods for
    converting EMA avails data contained within an excel spreadsheet
    into an XML representation.  Both "SAX" (i.e. row at a time) and
